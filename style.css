@@ -139,3 +139,5 @@ html[dir="rtl"] .va-k:before{inset:0 0 0 auto}
 #lapn{font-family:var(--fnum)}
 ::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:var(--line2);border-radius:10px}::-webkit-scrollbar-track{background:transparent}
 @media(max-width:700px){main{padding:12px}.hd{padding:8px 12px}.hbtn .lbl{display:none}}
+.auth-card #api{letter-spacing:0;font-size:13px;text-align:start}
+.va-k small,.num small{font-family:var(--font);letter-spacing:0}
