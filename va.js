@@ -366,3 +366,4 @@ function bindSw() {
 window.BTV.views.btVideo = vVideo;
 window.BTV.video = { section: swimmerSection, bind: bindSwimmerSection, compute: compute };
 })();
+
