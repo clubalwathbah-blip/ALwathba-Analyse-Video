@@ -31,7 +31,7 @@ var D = {
 function T(k) { var v = D[k]; return v ? (LANG === 'fr' ? v[1] : v[0]) : k; }
 
 /* ---------------- serveur ---------------- */
-var DEFAULT_API = '';
+var DEFAULT_API = 'https://script.google.com/macros/s/AKfycbzd8TmPOJHySMIZJzYCSiitGXHiQpe6Cka64vML0banBpa3poEAnVX5D4eupqq9VeMM/exec';
 (function () { try { var q = new URLSearchParams(location.search).get('api'); if (q && /^https:\/\/script\.google\.com\/.+\/exec$/.test(q)) localStorage.setItem('wav_api', q); } catch (e) {} })();
 var API = {
   url: function () { return ls('wav_api') || DEFAULT_API; },
