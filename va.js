@@ -115,7 +115,7 @@ function anaHtml() {
     '<span class="sp"></span><span class="mono ltr" id="tdisp" style="font-weight:700">0.00</span><span class="chip ltr" id="fpsd"></span><button class="btn sm" id="angb">' + T('angle') + '</button><button class="btn sm" id="snap">' + T('snap') + '</button><label class="btn sm" style="margin:0">📂<input type="file" id="vfile2" accept="video/*" hidden></label></div>' +
     '<div class="small muted" dir="auto" style="margin-top:6px;text-align:start">' + T('keys') + '</div></div></div>';
   if (VS.url) h += '<div class="card va-evc"><div class="row" style="margin-bottom:6px"><h3 style="margin:0">' + T('lap') + ' <span id="lapn" class="chip ltr" dir="ltr">1</span></h3><span class="sp small muted">' + T('evHelp') + '</span></div><div class="va-btns" id="evbtns"></div></div>';
-  h += '<div class="card" id="vres"></div></div>';
+  h += '<div class="card" id="vres"></div><div id="vlc">' + lapCmpHtml() + '</div></div>';
   // panneau
   h += '<div class="va-side"><div class="card"><div class="f"><label>' + T('vaSw') + '</label><select data-vc="sid"><option value="">— ' + T('needSw') + ' —</option>' + sws.map(function (s) { return '<option value="' + s.id + '"' + (c.sid === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('') + '</select></div>' +
     '<div class="fr"><div class="f"><label>' + T('date') + '</label><input type="date" data-vc="date" value="' + c.date + '"></div><div class="f"><label>' + T('vaCtx') + '</label>' + sel('ctx', [['train', T('vaTrain')], ['comp', T('vaComp')]], c.ctx) + '</div></div>' +
@@ -124,7 +124,7 @@ function anaHtml() {
     '<div class="fr"><div class="f"><label>' + T('vaSlow') + '</label>' + sel('slow', [[1, T('slow1')], [2, 'Slow ×2'], [4, 'Slow ×4'], [8, 'Slow ×8']], c.slow) + '</div><div class="f"><label>' + T('vaFps') + '</label><select id="fpssel">' + [['auto', T('vaAuto')], [25, 25], [30, 30], [50, 50], [60, 60], [120, 120], [240, 240]].map(function (o) { return '<option value="' + o[0] + '"' + ((VS.fpsAuto && o[0] === 'auto') || (!VS.fpsAuto && +o[0] === VS.fps) ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div></div>' +
     '<div class="f"><input data-vc="label" placeholder="' + esc(T('vaLabel')) + '" value="' + esc(c.label) + '"></div>' +
     '<div class="f" style="margin:0"><label>' + T('notes') + '</label><textarea data-vc="notes" rows="3" placeholder="' + esc(T('notesP')) + '">' + esc(c.notes || '') + '</textarea></div></div>';
-  h += '<div class="card"><h3>' + T('events') + '</h3><div id="evlist" class="va-evl"></div><div class="row" style="margin-top:10px;flex-wrap:wrap"><button class="btn pri" id="vsave">' + T('saveVa') + '</button><button class="btn sm" id="vnew">' + T('newVa') + '</button></div></div></div></div>';
+  h += '<div class="card"><h3>' + T('events') + '</h3><div id="evlist" class="va-evl"></div><div class="row" style="margin-top:10px;flex-wrap:wrap"><button class="btn pri" id="vsave">' + T('saveVa') + '</button><button class="btn" id="vrep">' + rt('report', L()) + '</button><button class="btn sm" id="vnew">' + T('newVa') + '</button></div></div></div></div>';
   return h;
 }
 function curLap() { var vid = $('#vid'), t = vid ? vid.currentTime : 0, n = laps(VS.cfg), w = VS.ev.filter(function (e) { return (e.k === 'W' || e.k === 'F') && e.t <= t + 1e-6; }).length; return Math.min(n, w + 1); }
@@ -154,12 +154,13 @@ function refresh() {
   $$('#evlist [data-seek]').forEach(function (tr) { tr.onclick = function (e) { if (e.target.dataset.del != null) return; var v = $('#vid'); if (v) { v.pause(); seekV(v, +tr.dataset.seek); } }; });
   $$('#evlist [data-del]').forEach(function (b) { b.onclick = function () { VS.ev.splice(+b.dataset.del, 1); VS.dirty = true; refresh(); }; });
   var tl = $('#vtl'), vd = $('#vid'); if (tl && vd && vd.duration) { tl.innerHTML = ev.map(function (e) { return '<i class="' + e.k + '" data-tt="' + e.t + '" title="' + esc(evLabel(e)) + '" style="left:' + (e.t / vd.duration * 100).toFixed(3) + '%"></i>'; }).join(''); $$('#vtl i').forEach(function (x) { x.onclick = function () { vd.pause(); seekV(vd, +x.dataset.tt); }; }); }
-  $('#vres').innerHTML = resHtml(r, c);
+  $('#vres').innerHTML = aidHtml(c, VS.ev, r) + resHtml(r, c);
+  bindAid();
   drawChart(r, 'vch');
 }
-function kpi(l, v, u) { return '<div class="kbox va-k"><div class="small muted">' + l + '</div><div class="num" style="font-size:22px;font-weight:800"><span dir="ltr">' + v + (u ? ' <small class="muted">' + u + '</small>' : '') + '</span></div></div>'; }
+function kpi(l, v, u, hk) { return '<div class="kbox va-k"><div class="small muted">' + l + '</div><div class="num" style="font-size:22px;font-weight:800"><span dir="ltr">' + v + (u ? ' <small class="muted">' + u + '</small>' : '') + '</span></div>' + (hk ? '<div class="va-hint">' + rt('x_' + hk, L()) + '</div>' : '') + '</div>'; }
 function resHtml(r, c) {
-  var h = '<div class="va-kpis">' + kpi(T('final'), ft(r.final)) + (c.start === 'dive' ? kpi(T('rt'), f2(r.rt), 's') : '') + kpi(T('t15'), f2(r.t15), 's') + (r.turns.length ? kpi(T('turnAvg'), f2(r.turn), 's') : '') + kpi(T('vClean'), f2(r.v), 'm/s') + kpi(T('srAvg'), f2(r.sr, 1), T('cpm')) + kpi(T('dpsAvg'), f2(r.dps), 'm') + (r.fin5 != null ? kpi(T('fin5'), f2(r.fin5), 's') : '') + '</div>';
+  var h = '<div class="va-kpis">' + kpi(T('final'), ft(r.final), '', 'final') + (c.start === 'dive' ? kpi(T('rt'), f2(r.rt), 's', 'rt') : '') + kpi(T('t15'), f2(r.t15), 's', 't15') + (r.turns.length ? kpi(T('turnAvg'), f2(r.turn), 's', 'turn') : '') + kpi(T('vClean'), f2(r.v), 'm/s', 'v') + kpi(T('srAvg'), f2(r.sr, 1), T('cpm'), 'sr') + kpi(T('dpsAvg'), f2(r.dps), 'm', 'dps') + (r.fin5 != null ? kpi(T('fin5'), f2(r.fin5), 's', 'fin5') : '') + '</div>';
   h += '<div class="tbl-wrap"><table><tr><th>' + T('lap') + '</th><th>' + T('split') + '</th><th>' + T('cum') + '</th><th>' + T('brk') + '</th><th>' + T('vClean') + '</th><th>' + T('srAvg') + '</th><th>' + T('dpsAvg') + '</th><th>' + T('si') + '</th><th>' + T('turn') + ' (in+out)</th></tr>' +
     r.laps.map(function (l) { return '<tr><td><b>' + l.i + '</b></td><td class="num">' + f2(l.split) + '</td><td class="num">' + ft(l.cum) + '</td><td class="num"><span dir="ltr">' + (l.brkT != null ? f2(l.brkT) + ' s' + (l.brkD != null ? ' · ≈' + f2(l.brkD, 1) + ' m' : '') : '—') + '</span></td><td class="num">' + f2(l.v) + '</td><td class="num">' + f2(l.sr, 1) + '</td><td class="num">' + f2(l.dps) + '</td><td class="num">' + f2(l.si) + '</td><td class="num">' + (l.turn && l.turn.tot != null ? '<span dir="ltr"><b>' + f2(l.turn.tot) + '</b> <small class="muted">(' + f2(l.turn.inn) + '+' + f2(l.turn.out) + ')</small></span>' : '—') + '</td></tr>'; }).join('') + '</table></div>';
   if (r.vDrop != null || r.srDrop != null) h += '<p class="small"><b>' + T('drop') + ' :</b> ' + (r.vDrop != null ? T('vClean') + ' <b class="num">' + (r.vDrop >= 0 ? '−' : '+') + f2(Math.abs(r.vDrop), 1) + '%</b>' : '') + (r.srDrop != null ? ' · ' + T('srAvg') + ' <b class="num">' + (r.srDrop >= 0 ? '−' : '+') + f2(Math.abs(r.srDrop), 1) + '%</b>' : '') + '</p>';
@@ -187,7 +188,9 @@ function bindAna() {
   var drop = $('#drop'); drop.ondragover = function (e) { e.preventDefault(); }; drop.ondrop = function (e) { e.preventDefault(); var f = e.dataTransfer.files[0]; if (f && /video/.test(f.type)) setVideo(f); };
   $('#fpssel').onchange = function () { if (this.value === 'auto') { VS.fpsAuto = true; } else { VS.fpsAuto = false; VS.fps = +this.value; } showFps(); };
   $('#vsave').onclick = saveVa;
-  $('#vnew').onclick = function () { if (VS.dirty && !confirm(T('unsaved'))) return; VS.id = null; VS.ev = []; VS.dirty = false; VS.cfg = Object.assign(defCfg(), { sid: c.sid, date: c.date, ctx: c.ctx, pool: c.pool, dist: c.dist, stroke: c.stroke, start: c.start, slow: c.slow }); K.render(); };
+  $('#vrep').onclick = function () { if (!VS.ev.length) { K.toast(T('noEv')); return; } if (!VS.cfg.sid) { K.toast(T('needSw')); return; } openReport(curSrc()); };
+  bindLapCmp();
+  $('#vnew').onclick = function () { if (VS.dirty && !confirm(T('unsaved'))) return; VS.id = null; VS.ev = []; VS.snaps = []; VS.dirty = false; VS.cfg = Object.assign(defCfg(), { sid: c.sid, date: c.date, ctx: c.ctx, pool: c.pool, dist: c.dist, stroke: c.stroke, start: c.start, slow: c.slow }); K.render(); };
   refresh();
   var vid = $('#vid'); if (!vid || !VS.url) return;
   vid.playbackRate = 0.25;
@@ -223,6 +226,7 @@ function bindAna() {
   $('#snap').onclick = function () {
     var cv = document.createElement('canvas'), o = $('#ov'); cv.width = vid.videoWidth; cv.height = vid.videoHeight; var g = cv.getContext('2d'); g.drawImage(vid, 0, 0);
     if (o && o.width) g.drawImage(o, 0, 0, cv.width, cv.height);
+    try { var tw = Math.min(640, cv.width), tc = document.createElement('canvas'); tc.width = tw; tc.height = Math.round(cv.height * tw / cv.width); tc.getContext('2d').drawImage(cv, 0, 0, tc.width, tc.height); VS.snaps = (VS.snaps || []).concat([tc.toDataURL('image/jpeg', 0.75)]).slice(-3); VS.dirty = true; } catch (e) {}
     var a = document.createElement('a'); a.href = cv.toDataURL('image/png'); a.download = (swName(c.sid) || 'nageur').replace(/\s+/g, '_') + '_' + (c.date || K.today()) + '_' + vid.currentTime.toFixed(2) + 's.png'; a.click();
   };
   $('#angb').onclick = function () { VS.angle = !VS.angle; VS.pts = []; this.classList.toggle('pri', VS.angle); $('#ov').style.pointerEvents = VS.angle ? 'auto' : 'none'; drawOv(); if (VS.angle) { vid.pause(); K.toast(T('angleHelp')); } };
@@ -273,12 +277,13 @@ function saveVa() {
   var r = compute(c, VS.ev), id = VS.id || K.uid();
   var sum = { final: r.final, rt: r.rt, t15: r.t15, turn: r.turn, turnSum: r.turnSum, v: r.v, sr: r.sr, dps: r.dps, fin5: r.fin5, vDrop: r.vDrop, srDrop: r.srDrop };
   K.mutate('saveTest', { rec: { id: id, swimmerId: c.sid, type: 'va', date: c.date || K.today(), data: { cfg: JSON.parse(JSON.stringify(c)), ev: VS.ev.map(function (e) { return { k: e.k, t: Math.round(e.t * 10000) / 10000, d: e.d }; }), fname: VS.fname, sum: sum } } });
+  if (VS.snaps && VS.snaps.length) { try { localStorage.setItem('wav_snaps_' + id, JSON.stringify(VS.snaps)); } catch (e) {} }
   VS.id = id; VS.dirty = false; K.toast(T('saved')); K.render();
 }
 function openRec(rec) {
   VS.id = rec.id; VS.cfg = Object.assign(defCfg(), rec.data.cfg || {}, { sid: rec.swimmerId, date: rec.date }); VS.ev = (rec.data.ev || []).map(function (e) { return { k: e.k, t: e.t, d: e.d }; });
   if (VS.fname !== rec.data.fname && VS.url) { try { URL.revokeObjectURL(VS.url); } catch (e) {} VS.url = null; }
-  VS.fname = rec.data.fname || ''; VS.dirty = false; VS.tab = 'new'; K.render();
+  VS.fname = rec.data.fname || ''; VS.snaps = snapsOf(rec.id).slice(); VS.dirty = false; VS.tab = 'new'; K.render();
 }
 
 /* ---------- historique ---------- */
@@ -286,12 +291,13 @@ function histHtml() {
   var list = vaRecs().filter(function (r) { return !VS.filt || r.swimmerId === VS.filt; });
   if (!vaRecs().length) return '<div class="card empty" style="margin-top:12px">' + T('noEv') + '</div>';
   return '<div class="card" style="margin-top:12px"><div class="row"><p class="small muted sp">' + T('cmpPick') + '</p><select id="hfilt" style="width:auto"><option value="">' + T('swimmers') + ' : —</option>' + K.visibleSwimmers().map(function (s) { return '<option value="' + s.id + '"' + (VS.filt === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('') + '</select></div><div class="tbl-wrap"><table><tr><th></th><th>' + T('date') + '</th><th style="text-align:start">' + T('vaSw') + '</th><th>' + T('vaCtx') + '</th><th></th><th>' + T('final') + '</th><th>' + T('t15') + '</th><th>' + T('turnAvg') + '</th><th>' + T('vClean') + '</th><th>' + T('srAvg') + '</th><th>' + T('dpsAvg') + '</th><th></th></tr>' +
-    list.map(function (r) { var c = r.data.cfg || {}, s = r.data.sum || {}, st = STROKES.find(function (x) { return x[0] === c.stroke; }); return '<tr><td><input type="checkbox" data-pick="' + r.id + '"' + (VS.sel.indexOf(r.id) >= 0 ? ' checked' : '') + ' style="width:auto"></td><td class="num">' + K.fmtDate(r.date) + '</td><td style="text-align:start"><b>' + esc(swName(r.swimmerId)) + '</b><div class="small muted">' + esc(c.label || '') + (c.notes ? ' · 📝 ' + esc(c.notes.slice(0, 60)) + (c.notes.length > 60 ? '…' : '') : '') + '</div></td><td><span class="chip' + (c.ctx === 'comp' ? ' warn' : '') + '">' + T(c.ctx === 'comp' ? 'vaComp' : 'vaTrain') + '</span></td><td class="small">' + c.dist + ' ' + (st ? tv(st[1]) : '') + ' · ' + c.pool + 'm</td><td class="num"><b>' + ft(s.final) + '</b></td><td class="num">' + f2(s.t15) + '</td><td class="num">' + f2(s.turn) + '</td><td class="num">' + f2(s.v) + '</td><td class="num">' + f2(s.sr, 1) + '</td><td class="num">' + f2(s.dps) + '</td><td style="white-space:nowrap"><button class="btn sm" data-open="' + r.id + '">' + T('loadVa') + '</button> <button class="btn sm" data-vdel="' + r.id + '">✕</button></td></tr>'; }).join('') +
+    list.map(function (r) { var c = r.data.cfg || {}, s = r.data.sum || {}, st = STROKES.find(function (x) { return x[0] === c.stroke; }); return '<tr><td><input type="checkbox" data-pick="' + r.id + '"' + (VS.sel.indexOf(r.id) >= 0 ? ' checked' : '') + ' style="width:auto"></td><td class="num">' + K.fmtDate(r.date) + '</td><td style="text-align:start"><b>' + esc(swName(r.swimmerId)) + '</b><div class="small muted">' + esc(c.label || '') + (c.notes ? ' · 📝 ' + esc(c.notes.slice(0, 60)) + (c.notes.length > 60 ? '…' : '') : '') + '</div></td><td><span class="chip' + (c.ctx === 'comp' ? ' warn' : '') + '">' + T(c.ctx === 'comp' ? 'vaComp' : 'vaTrain') + '</span></td><td class="small">' + c.dist + ' ' + (st ? tv(st[1]) : '') + ' · ' + c.pool + 'm</td><td class="num"><b>' + ft(s.final) + '</b></td><td class="num">' + f2(s.t15) + '</td><td class="num">' + f2(s.turn) + '</td><td class="num">' + f2(s.v) + '</td><td class="num">' + f2(s.sr, 1) + '</td><td class="num">' + f2(s.dps) + '</td><td style="white-space:nowrap"><button class="btn sm" data-open="' + r.id + '">' + T('loadVa') + '</button> <button class="btn sm" data-rep="' + r.id + '">📄</button> <button class="btn sm" data-vdel="' + r.id + '">✕</button></td></tr>'; }).join('') +
     '</table></div><div class="row" style="margin-top:10px"><button class="btn pri" id="gocmp"' + (VS.sel.length === 2 ? '' : ' disabled') + '>' + T('cmpGo') + '</button></div></div>';
 }
 function bindHist() {
   var hf = $('#hfilt'); if (hf) hf.onchange = function () { VS.filt = this.value; K.render(); };
   $$('[data-pick]').forEach(function (b) { b.onchange = function () { var id = b.dataset.pick, i = VS.sel.indexOf(id); if (b.checked && i < 0) VS.sel.push(id); if (!b.checked && i >= 0) VS.sel.splice(i, 1); if (VS.sel.length > 2) VS.sel.shift(); K.render(); }; });
+  $$('[data-rep]').forEach(function (b) { b.onclick = function () { openReport(recSrc(vaRecs().find(function (r) { return r.id === b.dataset.rep; }))); }; });
   $$('[data-open]').forEach(function (b) { b.onclick = function () { if (VS.dirty && !confirm(T('unsaved'))) return; openRec(vaRecs().find(function (r) { return r.id === b.dataset.open; })); }; });
   $$('[data-vdel]').forEach(function (b) { b.onclick = function () { if (!confirm(T('confirmDel'))) return; K.mutate('delTest', { id: b.dataset.vdel }); VS.sel = VS.sel.filter(function (x) { return x !== b.dataset.vdel; }); if (VS.id === b.dataset.vdel) VS.id = null; K.render(); }; });
   var g = $('#gocmp'); if (g) g.onclick = function () { VS.tab = 'cmp'; VS.cmp = { urls: [null, null] }; K.render(); };
@@ -342,6 +348,266 @@ function swimmerSection(s) {
     list.slice(0, 12).map(function (r) { var c = r.data.cfg || {}, x = r.data.sum || {}; return '<tr><td class="num">' + K.fmtDate(r.date) + '</td><td class="small" style="text-align:start">' + c.dist + 'm · ' + T(c.ctx === 'comp' ? 'vaComp' : 'vaTrain') + (c.label ? ' · ' + esc(c.label) : '') + '</td><td class="num"><b>' + ft(x.final) + '</b></td><td class="num">' + f2(x.t15) + '</td><td class="num">' + f2(x.turn) + '</td><td class="num">' + f2(x.v) + '</td><td class="num">' + f2(x.sr, 1) + '</td><td class="num">' + f2(x.dps) + '</td><td><button class="btn sm" data-vopen="' + r.id + '">🎥</button></td></tr>'; }).join('') + '</table></div></div>';
 }
 function bindSwimmerSection() { $$('[data-vopen]').forEach(function (b) { b.onclick = function () { openRec(vaRecs().find(function (r) { return r.id === b.dataset.vopen; })); K.route('btVideo'); }; }); }
+
+/* ================= aide à la lecture : contrôles, résumé, phases ================= */
+var RD = {
+  ttl: ['تقرير تحليل السباق', 'Rapport d’analyse de course'], club: ['نادي الوثبة الرياضي · باتنة', 'Club Sportif Al-Wathba · Batna'],
+  sw: ['السباح', 'Nageur'], date: ['التاريخ', 'Date'], ev: ['السباق', 'Épreuve'], pool: ['مسبح', 'Bassin'], train: ['تدريب', 'Entraînement'], comp: ['منافسة', 'Compétition'],
+  final: ['الزمن النهائي', 'Temps final'], rt: ['ردة الفعل', 'Réaction'], t15: ['زمن 15 م', 'Temps 15 m'], turn: ['معدل الدوران', 'Virage moyen'], v: ['السرعة الصافية', 'Vitesse de nage'], sr: ['الإيقاع', 'Fréquence'], dps: ['المسافة/دورة', 'Distance/cycle'], fin5: ['آخر 5 م', '5 derniers m'],
+  x_final: ['من الإشارة حتى اللمس', 'du signal à la touche'], x_rt: ['الإشارة ← الرجلين يفارقو المكعب', 'signal → décollage'], x_t15: ['الانطلاق كامل حتى 15 م', 'départ complet jusqu’à 15 m'], x_turn: ['5 م قبل الحائط + 5 م بعدو', '5 m avant + 5 m après le mur'], x_v: ['بلا انطلاق ولا دوران', 'hors départ et virages'], x_sr: ['دورات ذراع في الدقيقة', 'cycles de bras par minute'], x_dps: ['قداش يتقدم في كل دورة', 'avance par cycle de bras'], x_fin5: ['النهاية: 5 م الأخيرة', 'arrivée : 5 derniers m'],
+  phases: ['وين راح الوقت', 'Répartition du temps'], ph_start: ['الانطلاق', 'Départ'], ph_swim: ['سباحة', 'Nage'], ph_turn: ['دوران', 'Virage'], ph_fin: ['الوصول', 'Arrivée'], ph_mix: ['…', '…'],
+  sum: ['الخلاصة', 'Synthèse'], good: ['نقطة قوة', 'Point fort'], bad: ['نقطة ضعف', 'Point faible'], focus: ['نخدمو على', 'À travailler'], noSum: ['ما كاينش علامات كافية للخلاصة (لازم 15 م، 20 م/5 م حول الحوائط، ودورات).', 'Repères insuffisants pour la synthèse (15 m, repères autour des murs, cycles).'],
+  laps: ['تفاصيل الأطوال', 'Détail par longueur'], lap: ['الطول', 'Long.'], split: ['الجزئي', 'Partiel'], cum: ['التراكمي', 'Cumul'], brk: ['الطلوع', 'Coulée'], si: ['مؤشر الضربة', 'Indice'], turnC: ['الدوران', 'Virage'],
+  chart: ['السرعة والإيقاع في كل طول', 'Vitesse et fréquence par longueur'], notes: ['ملاحظات تقنية', 'Notes techniques'], imgs: ['صور', 'Images'],
+  prev: ['مقارنة مع التحليل اللي فات', 'Comparaison avec l’analyse précédente'], gain: ['ربح', 'gagné'], loss: ['ضيّع', 'perdu'], same: ['نفس الشي', 'identique'],
+  warn: ['⚠ علامات مشكوك فيها: الأرقام المعنية ماهيش أكيدة', '⚠ Repères douteux : chiffres concernés non fiables'], gen: ['تقرير من «الوثبة تحليل فيديو»', 'Rapport généré par « Al-Wathba Analyse Vidéo »'],
+  c_rt: ['ردة الفعل {v} ث ماهيش معقولة (العادي 0.5–1.0): شوف «الإشارة» و«الرجلين يفارقو»', 'Réaction {v} s improbable (0,5–1,0) : vérifier « Signal » et « Décollage »'],
+  c_ord: ['الطول {l}: علامة {d} م جات قبل علامة أقرب منها', 'Longueur {l} : le repère {d} m arrive avant un repère plus proche'],
+  c_seg: ['الطول {l}: بين {a} و {b} م السرعة {v} م/ث ما تصراش', 'Longueur {l} : entre {a} et {b} m, vitesse {v} m/s impossible'],
+  c_tin: ['الدوران {l}: {v} ث في آخر 5 م ماهيش معقولة (العادي 1.5–4.5)', 'Virage {l} : {v} s sur les 5 derniers m improbable (1,5–4,5)'],
+  c_tout: ['الدوران {l}: {v} ث في أول 5 م ماهيش معقولة (العادي 1.0–4.0)', 'Virage {l} : {v} s sur les 5 premiers m improbable (1,0–4,0)'],
+  c_15: ['زمن 15 م {v} ث ماهوش معقول', 'Temps 15 m {v} s improbable'], c_brk: ['الطول {l}: الطلوع بعد {v} م (أكثر من 15 م ممنوع)', 'Longueur {l} : sortie à {v} m (> 15 m interdit)'],
+  go: ['روح لتما', 'Aller'], warnT: ['تنبيهات على العلامات', 'Alertes sur les repères'], okT: ['العلامات معقولة ✓', 'Repères cohérents ✓'],
+  s_start_g: ['انطلاق قوي: سرعة 15 م أسرع بـ {p}% من السباحة', 'Départ efficace : 15 m {p}% plus rapide que la nage'], s_start_b: ['الانطلاق ضعيف: سرعة 15 م غير {p}% فوق السباحة', 'Départ faible : 15 m seulement {p}% au-dessus de la nage'], f_start: ['الانطلاق: الدفعة، الدخول للماء، والضربات تحت الماء (دولفين)', 'Départ : impulsion, entrée dans l’eau et ondulations'],
+  s_turn_g: ['دوران مليح: أسرع من السباحة بـ {p}%', 'Bons virages : {p}% plus rapides que la nage'], s_turn_b: ['الدوران أبطأ من السباحة بـ {p}%: الوقت يضيع عند الحائط', 'Virages {p}% plus lents que la nage : temps perdu au mur'], f_turn: ['الدورانات: الاقتراب من الحائط، الدفعة، والطلوع', 'Virages : approche, poussée et coulée'],
+  s_fade_g: ['حافظ على السرعة (هبوط {p}% برك)', 'Vitesse maintenue (baisse de {p}% seulement)'], s_fade_b: ['السرعة طاحت {p}% من الطول الأول للخر', 'Vitesse en baisse de {p}% entre la 1re et la dernière longueur'],
+  f_fade_sr: ['الهبوط جاي خاصة من الإيقاع (طاح بـ {p}%): التحمّل والحفاظ على الريتم', 'La baisse vient surtout de la fréquence (−{p}%) : endurance et maintien du rythme'], f_fade_dps: ['الهبوط جاي خاصة من المسافة/دورة (طاحت بـ {p}%): التقنية تضعف مع التعب', 'La baisse vient surtout de la distance/cycle (−{p}%) : la technique se dégrade avec la fatigue'],
+  s_fin_g: ['نهاية قوية', 'Arrivée solide'], s_fin_b: ['النهاية بطيئة: آخر 5 م أبطأ بـ {p}% من السباحة', 'Arrivée lente : 5 derniers m {p}% sous la vitesse de nage'], f_fin: ['النهاية: ما يتنفسش في آخر 5 م، ويمد اليد للحائط', 'Arrivée : pas de respiration sur les 5 derniers m, allonge vers le mur'],
+  s_brk_g: ['طلوع طويل تحت الماء (≈{v} م)', 'Coulées longues (≈{v} m)'], s_brk_b: ['الطلوع قصير (≈{v} م)', 'Coulées courtes (≈{v} m)'], f_brk: ['الضربات تحت الماء بعد الانطلاق والدوران', 'Ondulations sous l’eau après départ et virages'],
+  pdf: ['📄 PDF', '📄 PDF'], img: ['🖼 صورة', '🖼 Image'], share: ['📤 مشاركة', '📤 Partager'], report: ['📄 التقرير', '📄 Rapport'], lang: ['لغة التقرير', 'Langue du rapport'], close: ['✕', '✕'],
+  lapCmp: ['🎞 مقارنة طولين في نفس الفيديو', '🎞 Comparer deux longueurs (même vidéo)'], lapCmpH: ['مثلاً الطول الأول (قبل التعب) ضد اللخراني (مع التعب). «مزامنة» تحط الزوج على بداية الطول.', 'Ex. 1re longueur (frais) contre la dernière (fatigue). « Synchroniser » cale les deux au début de la longueur.'],
+  paneA: ['الجزء الأول (مثلاً الطول 1)', 'Partie A (ex. longueur 1)'], paneB: ['الجزء الثاني (مثلاً الطول الأخير)', 'Partie B (ex. dernière longueur)'],
+  syncL: ['⏱ مزامنة على بداية الطول', '⏱ Caler au début de la longueur']
+};
+function rt(k, lg, o) { var v = RD[k]; var s = v ? (lg === 'fr' ? v[1] : v[0]) : k; if (o) Object.keys(o).forEach(function (x) { s = s.split('{' + x + '}').join(o[x]); }); return s; }
+function r1(x) { return (Math.round(x * 10) / 10).toFixed(1); }
+function stName(c, lg) { var s = STROKES.find(function (x) { return x[0] === c.stroke; }); return s ? (lg === 'fr' ? s[1][1] : s[1][0]) : ''; }
+
+/* --- contrôles de cohérence des repères --- */
+function checkEv(c, evs, r, lg) {
+  var out = [], P = +c.pool, f = +c.slow || 1, add = function (msg, t, lvl) { if (!out.some(function (x) { return x.msg === msg; })) out.push({ msg: msg, t: t, lvl: lvl || 'bad' }); };
+  var ev = evs.slice().sort(function (a, b) { return a.t - b.t; }), sig = ev.find(function (e) { return e.k === 'S'; }), o = ev.find(function (e) { return e.k === 'O'; });
+  if (c.start === 'dive' && r.rt != null && (r.rt < 0.4 || r.rt > 1.3)) add(rt('c_rt', lg, { v: r1(r.rt) }), o ? o.t : null);
+  var walls = ev.filter(function (e) { return e.k === 'W' || e.k === 'F'; });
+  for (var i = 1; i <= r.n; i++) {
+    var L0 = i === 1 ? (sig ? sig.t : null) : (walls[i - 2] ? walls[i - 2].t : null), L1 = walls[i - 1] ? walls[i - 1].t : null;
+    var mk = ev.filter(function (e) { return e.k === 'M' && e.lap === i; });
+    mk.forEach(function (m, j) { mk.forEach(function (n2, k) { if (k > j && n2.d < m.d) add(rt('c_ord', lg, { l: i, d: m.d }), m.t); }); });
+    var pts = []; if (L0 != null) pts.push({ d: 0, t: L0, m: null }); mk.slice().sort(function (a, b) { return a.d - b.d; }).forEach(function (m) { pts.push({ d: m.d, t: m.t, m: m }); }); if (L1 != null) pts.push({ d: P, t: L1, m: null });
+    for (var k = 1; k < pts.length; k++) {
+      var a = pts[k - 1], b = pts[k], dt = (b.t - a.t) / f; if (dt <= 0) continue;
+      var sp = (b.d - a.d) / dt, lo = i === 1 && a.d === 0 ? 0.45 : 0.45, hi = a.d === 0 ? 3.2 : 2.45;
+      if (sp > hi || sp < lo) add(rt('c_seg', lg, { l: i, a: a.d, b: b.d, v: r1(sp) }), (b.m || a.m || {}).t);
+    }
+    var lp = r.laps[i - 1]; if (lp && lp.brkD != null && lp.brkD > 15) add(rt('c_brk', lg, { l: i, v: r1(lp.brkD) }), (ev.find(function (e) { return e.k === 'B' && e.lap === i; }) || {}).t);
+  }
+  r.turns.forEach(function (tr) {
+    if (tr.inn != null && (tr.inn < 1.5 || tr.inn > 4.5)) add(rt('c_tin', lg, { l: tr.k, v: r1(tr.inn) }), (ev.find(function (e) { return e.k === 'M' && e.lap === tr.k && e.d === P - 5; }) || {}).t);
+    if (tr.out != null && (tr.out < 1.0 || tr.out > 4.0)) add(rt('c_tout', lg, { l: tr.k, v: r1(tr.out) }), (ev.find(function (e) { return e.k === 'M' && e.lap === tr.k + 1 && e.d === 5; }) || {}).t);
+  });
+  if (r.t15 != null && (r.t15 < 4.5 || r.t15 > 13)) add(rt('c_15', lg, { v: r1(r.t15) }), (ev.find(function (e) { return e.k === 'M' && e.lap === 1 && e.d === 15; }) || {}).t);
+  return out;
+}
+/* --- répartition du temps par phase --- */
+function phasesOf(c, evs, r) {
+  var P = +c.pool, f = +c.slow || 1, ev = evs.slice().sort(function (a, b) { return a.t - b.t; }), sig = ev.find(function (e) { return e.k === 'S'; });
+  if (!sig || r.final == null) return null;
+  var walls = ev.filter(function (e) { return e.k === 'W' || e.k === 'F'; }), m = function (lap, d) { var x = ev.find(function (e) { return e.k === 'M' && e.lap === lap && e.d === d; }); return x ? x.t : null; };
+  var B = [{ t: sig.t, k: 'start' }]; B.push({ t: m(1, 15), k: 'swim' });
+  for (var i = 1; i < r.n; i++) { B.push({ t: m(i, P - 5), k: 'turn' }); B.push({ t: m(i + 1, 5), k: 'swim' }); }
+  B.push({ t: m(r.n, P - 5), k: 'fin' }); B.push({ t: walls[r.n - 1] ? walls[r.n - 1].t : null, k: 'end' });
+  var segs = [], cur = B[0];
+  for (var j = 1; j < B.length; j++) {
+    if (B[j].t == null) { if (cur.k !== 'mix') cur = { t: cur.t, k: cur.k === B[j].k ? cur.k : 'mix', mixed: true }; continue; }
+    if (B[j].t < cur.t) return null;
+    segs.push({ k: cur.mixed ? 'mix' : cur.k, d: (B[j].t - cur.t) / f }); cur = B[j];
+  }
+  // fusion des phases consécutives identiques
+  var o = []; segs.forEach(function (s) { if (o.length && o[o.length - 1].k === s.k && s.k === 'mix') o[o.length - 1].d += s.d; else o.push(s); });
+  return o;
+}
+var PHC = { start: '#f472b6', swim: '#22d3ee', turn: '#a3e635', fin: '#fbbf24', mix: '#64748b' };
+/* --- synthèse automatique (version entraîneur) --- */
+function summary(c, r, lg) {
+  var G = [], Bd = [], F2 = [];
+  if (!r.v) return null;
+  var P = +c.pool;
+  if (r.t15 != null && c.start !== 'push') { var sr0 = (15 / r.t15) / r.v - 1; if (sr0 >= 0.35) G.push([sr0, rt('s_start_g', lg, { p: Math.round(sr0 * 100) })]); else if (sr0 < 0.2) { Bd.push([0.2 - sr0, rt('s_start_b', lg, { p: Math.round(sr0 * 100) }), rt('f_start', lg)]); } }
+  if (r.turn != null) { var tr = (10 / r.turn) / r.v - 1; if (tr >= 0.15) G.push([tr, rt('s_turn_g', lg, { p: Math.round(tr * 100) })]); else if (tr < 0) Bd.push([-tr + 0.1, rt('s_turn_b', lg, { p: Math.round(-tr * 100) }), rt('f_turn', lg)]); }
+  var vl = r.laps.filter(function (l) { return l.v; }), vLast = vl.length ? vl[vl.length - 1].v : r.v;
+  if (r.fin5 != null) { var fr = (5 / r.fin5) / vLast - 1; if (fr >= -0.02) G.push([0.05, rt('s_fin_g', lg)]); else if (fr < -0.1) Bd.push([-fr, rt('s_fin_b', lg, { p: Math.round(-fr * 100) }), rt('f_fin', lg)]); }
+  if (r.vDrop != null) {
+    if (r.vDrop <= 4) G.push([0.1, rt('s_fade_g', lg, { p: r1(Math.max(0, r.vDrop)) })]);
+    else if (r.vDrop > 8) {
+      var dl = r.laps.filter(function (l) { return l.dps; }), dd = dl.length >= 2 ? (dl[0].dps - dl[dl.length - 1].dps) / dl[0].dps * 100 : null;
+      var fx = r.srDrop != null && dd != null ? (r.srDrop >= dd ? rt('f_fade_sr', lg, { p: r1(r.srDrop) }) : rt('f_fade_dps', lg, { p: r1(dd) })) : rt('f_fade_sr', lg, { p: r1(r.srDrop || 0) });
+      Bd.push([r.vDrop / 50, rt('s_fade_b', lg, { p: r1(r.vDrop) }), fx]);
+    }
+  }
+  var bk = r.laps.map(function (l) { return l.brkD; }).filter(function (x) { return x != null && x <= 15; });
+  if (bk.length) { var ab = bk.reduce(function (a, b) { return a + b; }, 0) / bk.length; if (ab >= 6) G.push([0.08, rt('s_brk_g', lg, { v: r1(ab) })]); else if (ab < 4) Bd.push([0.15, rt('s_brk_b', lg, { v: r1(ab) }), rt('f_brk', lg)]); }
+  G.sort(function (a, b) { return b[0] - a[0]; }); Bd.sort(function (a, b) { return b[0] - a[0]; });
+  if (!G.length && !Bd.length) return null;
+  return { good: G.slice(0, 2).map(function (x) { return x[1]; }), bad: Bd.slice(0, 2).map(function (x) { return x[1]; }), focus: Bd.length ? Bd[0][2] : null };
+}
+/* --- analyse précédente comparable --- */
+function prevOf(sid, c, id, date) {
+  return vaRecs().filter(function (x) { var q = x.data.cfg || {}; return x.id !== id && x.swimmerId === sid && +q.dist === +c.dist && q.stroke === c.stroke && +q.pool === +c.pool && (x.date || '') <= (date || '9999'); })[0] || null;
+}
+/* --- blocs HTML pour l'écran d'analyse --- */
+function aidHtml(c, evs, r) {
+  var lg = L(), ck = checkEv(c, evs, r, lg), sm = summary(c, r, lg), ph = phasesOf(c, evs, r), h = '';
+  if (evs.length > 3) h += '<div class="va-chk ' + (ck.length ? 'bad' : 'ok') + '"><b>' + (ck.length ? '⚠ ' + rt('warnT', lg) : rt('okT', lg)) + '</b>' + ck.map(function (x) { return '<div class="row" style="gap:8px;margin-top:6px"><span class="sp">' + esc(x.msg) + '</span>' + (x.t != null ? '<button class="btn sm" data-goto="' + x.t + '">' + rt('go', lg) + ' ▸</button>' : '') + '</div>'; }).join('') + '</div>';
+  if (ph && ph.length) {
+    var tot = ph.reduce(function (a, b) { return a + b.d; }, 0);
+    h += '<div class="va-phw"><div class="small muted" style="margin-bottom:6px">' + rt('phases', lg) + '</div><div class="va-ph">' + ph.map(function (p) { return '<div style="flex:' + (p.d / tot).toFixed(4) + ';background:' + PHC[p.k] + '" title="' + rt('ph_' + p.k, lg) + ' ' + p.d.toFixed(2) + ' s"><span dir="ltr">' + p.d.toFixed(2) + '</span></div>'; }).join('') + '</div><div class="row small muted" style="gap:12px;margin-top:6px">' + ['start', 'swim', 'turn', 'fin'].map(function (k) { return '<span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:' + PHC[k] + '"></i> ' + rt('ph_' + k, lg) + '</span>'; }).join('') + '</div></div>';
+  }
+  if (sm) h += '<div class="va-sum"><div class="small muted">' + rt('sum', lg) + '</div>' + sm.good.map(function (x) { return '<div>✅ <b>' + rt('good', lg) + ' :</b> ' + esc(x) + '</div>'; }).join('') + sm.bad.map(function (x) { return '<div>🔻 <b>' + rt('bad', lg) + ' :</b> ' + esc(x) + '</div>'; }).join('') + (sm.focus ? '<div>🎯 <b>' + rt('focus', lg) + ' :</b> ' + esc(sm.focus) + '</div>' : '') + (ck.length ? '<div class="small" style="color:var(--warn)">' + rt('warn', lg) + '</div>' : '') + '</div>';
+  return h;
+}
+function bindAid() { $$('[data-goto]').forEach(function (b) { b.onclick = function () { var v = $('#vid'); if (v) { v.pause(); seekV(v, +b.dataset.goto); v.scrollIntoView({ behavior: 'smooth', block: 'center' }); } }; }); }
+
+/* ================= rapport (canvas → image / PDF) ================= */
+var LOGO = null; function logoImg() { return new Promise(function (ok) { if (LOGO) return ok(LOGO); var i = new Image(); i.onload = function () { LOGO = i; ok(i); }; i.onerror = function () { ok(null); }; i.src = 'logo.png'; }); }
+function snapsOf(id) { if (VS.id === id && VS.snaps && VS.snaps.length) return VS.snaps; try { return JSON.parse(localStorage.getItem('wav_snaps_' + id) || '[]'); } catch (e) { return []; } }
+function loadImgs(src) { return Promise.all(src.map(function (s) { return new Promise(function (ok) { var i = new Image(); i.onload = function () { ok(i); }; i.onerror = function () { ok(null); }; i.src = s; }); })); }
+function drawReport(src, lg) {
+  var c = src.cfg, evs = src.ev, r = compute(c, evs), ck = checkEv(c, evs, r, lg), sm = summary(c, r, lg), ph = phasesOf(c, evs, r);
+  var prev = prevOf(src.sid, c, src.id, src.date), pr = prev ? compute(Object.assign(defCfg(), prev.data.cfg), prev.data.ev || []) : null;
+  return Promise.all([logoImg(), loadImgs(snapsOf(src.id).slice(0, 3))]).then(function (res) {
+    var logo = res[0], snaps = res[1].filter(Boolean);
+    var W = 1240, M = 64, cv = document.createElement('canvas'); cv.width = W; cv.height = 4200;
+    var g = cv.getContext('2d'), rtl = lg !== 'fr', FN = '"IBM Plex Sans Arabic","Inter","Segoe UI",Tahoma,sans-serif', NF = '"Inter","Segoe UI",Arial,sans-serif';
+    var X = function (x) { return rtl ? W - x : x; };
+    var AR = /[\u0600-\u06FF]/; var tx = function (s, x, y, o) { o = o || {}; if (o.auto && !rtl && AR.test(s)) { o = Object.assign({}, o, { raw: 1, a: 'right' }); g.save(); g.font = (o.w || 500) + ' ' + (o.s || 22) + 'px ' + FN; g.fillStyle = o.c || '#0f172a'; g.direction = 'rtl'; g.textAlign = 'right'; g.fillText(String(s), W - M, y); g.restore(); return; } g.save(); g.font = (o.w || 500) + ' ' + (o.s || 22) + 'px ' + (o.n ? NF : FN); g.fillStyle = o.c || '#0f172a'; g.direction = o.n ? 'ltr' : (rtl ? 'rtl' : 'ltr'); g.textAlign = o.a || (o.n ? (rtl ? 'right' : 'left') : 'start'); g.textBaseline = 'alphabetic'; g.fillText(String(s), o.raw ? x : X(x), y); g.restore(); };
+    var wrap = function (s, x, y, maxW, o) { o = o || {}; g.save(); g.font = (o.w || 500) + ' ' + (o.s || 22) + 'px ' + FN; var words = String(s).split(' '), line = '', lines = []; words.forEach(function (w) { var t = line ? line + ' ' + w : w; if (g.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t; }); if (line) lines.push(line); g.restore(); lines.forEach(function (l, i) { tx(l, x, y + i * (o.lh || 32), o); }); return lines.length * (o.lh || 32); };
+    var rect = function (x, y, w, h, col, rad) { g.save(); g.fillStyle = col; g.beginPath(); var xx = rtl ? W - x - w : x; if (g.roundRect) g.roundRect(xx, y, w, h, rad || 0); else g.rect(xx, y, w, h); g.fill(); g.restore(); };
+    var title = function (s, y) { rect(M, y, 6, 30, '#0891b2', 3); tx(s, M + 18, y + 25, { s: 26, w: 700, c: '#0b2a6e' }); return y + 50; };
+    g.fillStyle = '#fff'; g.fillRect(0, 0, W, cv.height);
+    // en-tête
+    var hg = g.createLinearGradient(0, 0, W, 0); hg.addColorStop(0, '#0b2a6e'); hg.addColorStop(1, '#0891b2'); g.fillStyle = hg; g.fillRect(0, 0, W, 190);
+    if (logo) g.drawImage(logo, rtl ? W - M - 110 : M, 40, 110, 110);
+    tx(rt('ttl', lg), M + 135, 85, { s: 38, w: 800, c: '#fff' }); tx(rt('club', lg), M + 135, 125, { s: 22, c: '#cfe9ff' });
+    tx(ft(r.final), rtl ? M : W - M, 110, { s: 64, w: 800, c: '#fff', n: 1, raw: 1, a: rtl ? 'left' : 'right' }); tx(rt('final', lg), rtl ? M + 2 : W - M, 145, { s: 20, c: '#cfe9ff', raw: 1, a: rtl ? 'left' : 'right' });
+    var y = 240, info = [[rt('sw', lg), swName(src.sid)], [rt('date', lg), K.fmtDate(src.date)], [rt('ev', lg), c.dist + (lg === 'fr' ? ' m ' : ' م ') + stName(c, lg) + ' · ' + rt('pool', lg) + ' ' + c.pool], ['', rt(c.ctx === 'comp' ? 'comp' : 'train', lg) + (c.label ? ' · ' + c.label : '')]];
+    info.forEach(function (it, i) { var cx = M + (i % 2) * 560, cy = y + Math.floor(i / 2) * 40; if (it[0]) tx(it[0] + ' :', cx, cy, { s: 20, c: '#64748b' }); tx(it[1], cx + (it[0] ? 120 : 0), cy, { s: 22, w: 700 }); });
+    y += 100;
+    if (ck.length) { var hh = 44 + ck.length * 30; rect(M, y, W - 2 * M, hh, '#fff4e5', 12); tx(rt('warn', lg), M + 20, y + 32, { s: 20, w: 700, c: '#b45309' }); ck.forEach(function (x, i) { tx('• ' + x.msg, M + 20, y + 64 + i * 30, { s: 18, c: '#92400e' }); }); y += hh + 24; }
+    // KPI
+    var K8 = [['final', ft(r.final), ''], ['rt', c.start === 'dive' ? f2(r.rt) : '—', 's'], ['t15', f2(r.t15), 's'], ['turn', f2(r.turn), 's'], ['v', f2(r.v), 'm/s'], ['sr', f2(r.sr, 1), lg === 'fr' ? 'cyc/min' : 'دورة/د'], ['dps', f2(r.dps), 'm'], ['fin5', f2(r.fin5), 's']];
+    var cw = (W - 2 * M - 3 * 16) / 4;
+    K8.forEach(function (k, i) { var cx = M + (i % 4) * (cw + 16), cy = y + Math.floor(i / 4) * 140; rect(cx, cy, cw, 124, '#f1f6fd', 14); rect(cx, cy, 5, 124, '#0891b2', 2); tx(rt(k[0], lg), cx + 20, cy + 34, { s: 20, w: 700, c: '#0b2a6e' }); var vx = rtl ? W - cx - 20 : cx + 20; tx(k[1] + (k[2] && k[1] !== '—' ? ' ' + k[2] : ''), vx, cy + 78, { s: 34, w: 800, n: 1, raw: 1, a: rtl ? 'right' : 'left' }); tx(rt('x_' + k[0], lg), cx + 20, cy + 108, { s: 15, c: '#64748b' }); });
+    y += 290;
+    // phases
+    if (ph && ph.length) {
+      y = title(rt('phases', lg), y); var tot = ph.reduce(function (a, b) { return a + b.d; }, 0), bw = W - 2 * M, x0 = 0;
+      ph.forEach(function (p) { var w = bw * p.d / tot; rect(M + x0, y, w - 3, 54, PHC[p.k], 6); if (w > 60) tx(p.d.toFixed(2), rtl ? W - M - x0 - w / 2 : M + x0 + w / 2, y + 36, { s: 20, w: 800, n: 1, raw: 1, a: 'center', c: '#0f172a' }); x0 += w; });
+      y += 78; var lx = 0; ['start', 'swim', 'turn', 'fin'].forEach(function (k) { rect(M + lx, y - 16, 18, 18, PHC[k], 4); tx(rt('ph_' + k, lg), M + lx + 28, y, { s: 18, c: '#334155' }); lx += 190; }); y += 40;
+    }
+    // synthèse
+    if (sm) {
+      y = title(rt('sum', lg), y);
+      var rows = sm.good.map(function (s) { return ['✅ ' + rt('good', lg) + ' : ', s, '#047857']; }).concat(sm.bad.map(function (s) { return ['🔻 ' + rt('bad', lg) + ' : ', s, '#b91c1c']; })); if (sm.focus) rows.push(['🎯 ' + rt('focus', lg) + ' : ', sm.focus, '#0b2a6e']);
+      rows.forEach(function (rw) { y += wrap(rw[0] + rw[1], M + 10, y + 22, W - 2 * M - 20, { s: 22, w: 600, c: rw[2], lh: 34 }) + 6; }); y += 20;
+    } else { y = title(rt('sum', lg), y); y += wrap(rt('noSum', lg), M + 10, y + 20, W - 2 * M - 20, { s: 19, c: '#64748b' }) + 20; }
+    // tableau des longueurs
+    y = title(rt('laps', lg), y);
+    var cols = [['lap', 0.07], ['split', 0.11], ['cum', 0.12], ['brk', 0.17], ['v', 0.12], ['sr', 0.11], ['dps', 0.11], ['turnC', 0.19]], tw = W - 2 * M;
+    rect(M, y, tw, 44, '#0b2a6e', 8); var cx0 = 0; cols.forEach(function (cl) { var w = tw * cl[1]; tx(rt(cl[0], lg), rtl ? W - M - cx0 - w / 2 : M + cx0 + w / 2, y + 29, { s: 17, w: 700, c: '#fff', raw: 1, a: 'center' }); cx0 += w; }); y += 44;
+    r.laps.forEach(function (l, i) {
+      if (i % 2) rect(M, y, tw, 40, '#f5f8fd', 0);
+      var vals = [String(l.i), f2(l.split), ft(l.cum), l.brkT != null ? f2(l.brkT) + ' s' + (l.brkD != null ? ' · ' + f2(l.brkD, 1) + ' m' : '') : '—', f2(l.v), f2(l.sr, 1), f2(l.dps), l.turn && l.turn.tot != null ? f2(l.turn.tot) + ' (' + f2(l.turn.inn) + '+' + f2(l.turn.out) + ')' : '—'];
+      var x1 = 0; cols.forEach(function (cl, j) { var w = tw * cl[1]; tx(vals[j], rtl ? W - M - x1 - w / 2 : M + x1 + w / 2, y + 27, { s: 18, w: j ? 500 : 800, n: 1, raw: 1, a: 'center' }); x1 += w; }); y += 40;
+    });
+    y += 30;
+    // graphique
+    var pv = r.laps.filter(function (l) { return l.v; });
+    if (pv.length >= 2) {
+      y = title(rt('chart', lg), y); var gx = M + 60, gw = W - 2 * M - 120, gh = 220, vs = r.laps.map(function (l) { return l.v; }), ss = r.laps.map(function (l) { return l.sr; });
+      var rng = function (a) { a = a.filter(function (x) { return x; }); if (!a.length) return null; var lo = Math.min.apply(null, a), hi = Math.max.apply(null, a), p = (hi - lo) * 0.2 || hi * 0.05; return [lo - p, hi + p]; };
+      var rv = rng(vs), rs = rng(ss), n = r.laps.length;
+      g.strokeStyle = '#e2e8f0'; g.lineWidth = 1; for (var q = 0; q <= 4; q++) { var gy = y + gh * q / 4; g.beginPath(); g.moveTo(gx, gy); g.lineTo(gx + gw, gy); g.stroke(); if (rv) tx((rv[1] - (rv[1] - rv[0]) * q / 4).toFixed(2), gx - 8, gy + 6, { s: 14, n: 1, raw: 1, a: 'right', c: '#0891b2' }); if (rs) tx((rs[1] - (rs[1] - rs[0]) * q / 4).toFixed(0), gx + gw + 8, gy + 6, { s: 14, n: 1, raw: 1, a: 'left', c: '#d97706' }); }
+      var line = function (a, rg, col, dash) { if (!rg) return; g.save(); g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 4; g.setLineDash(dash || []); g.beginPath(); var st = false; a.forEach(function (v, i) { if (!v) return; var px = gx + (n === 1 ? gw / 2 : gw * i / (n - 1)), py = y + gh * (1 - (v - rg[0]) / (rg[1] - rg[0])); if (!st) { g.moveTo(px, py); st = true; } else g.lineTo(px, py); }); g.stroke(); g.setLineDash([]); a.forEach(function (v, i) { if (!v) return; var px = gx + (n === 1 ? gw / 2 : gw * i / (n - 1)), py = y + gh * (1 - (v - rg[0]) / (rg[1] - rg[0])); g.beginPath(); g.arc(px, py, 6, 0, 7); g.fill(); }); g.restore(); };
+      line(vs, rv, '#0891b2'); line(ss, rs, '#d97706', [10, 8]);
+      for (var li = 0; li < n; li++) tx((lg === 'fr' ? 'L' : 'ط') + (li + 1), gx + (n === 1 ? gw / 2 : gw * li / (n - 1)), y + gh + 28, { s: 15, raw: 1, a: 'center', c: '#64748b' });
+      y += gh + 50; rect(M, y - 14, 30, 6, '#0891b2', 3); tx(rt('v', lg) + ' (m/s)', M + 42, y - 4, { s: 17, c: '#334155' }); rect(M + 330, y - 14, 30, 6, '#d97706', 3); tx(rt('sr', lg), M + 372, y - 4, { s: 17, c: '#334155' }); y += 40;
+    }
+    // comparaison
+    if (pr && pr.final != null && r.final != null) {
+      y = title(rt('prev', lg) + ' (' + K.fmtDate(prev.date) + ')', y);
+      var cmp = [['final', pr.final, r.final], ['t15', pr.t15, r.t15], ['turn', pr.turnSum, r.turnSum], ['fin5', pr.fin5, r.fin5], ['v', pr.v, r.v, 1]];
+      cmp.forEach(function (cm, i) { if (cm[1] == null || cm[2] == null) return; var d = cm[2] - cm[1], better = cm[3] ? d > 0 : d < 0, col = Math.abs(d) < 0.005 ? '#64748b' : better ? '#047857' : '#b91c1c'; var cx = M + (i % 3) * 380, cy = y + Math.floor(i / 3) * 70; tx(rt(cm[0], lg) + ' :', cx, cy + 24, { s: 19, c: '#334155' }); tx((d > 0 ? '+' : d < 0 ? '−' : '') + Math.abs(d).toFixed(2) + (cm[3] ? ' m/s' : ' s'), rtl ? W - cx - 190 : cx + 190, cy + 24, { s: 22, w: 800, n: 1, raw: 1, a: rtl ? 'right' : 'left', c: col }); });
+      y += 150;
+    }
+    // notes
+    if (c.notes) { y = title(rt('notes', lg), y); y += wrap(c.notes, M + 10, y + 20, W - 2 * M - 20, { s: 21, lh: 32, auto: 1 }) + 24; }
+    // images
+    if (snaps.length) {
+      y = title(rt('imgs', lg), y); var slot = (W - 2 * M - 2 * 16) / 3, ih = 0;
+      snaps.forEach(function (im, i) { var sc = Math.min(slot / im.width, 360 / im.height), w = im.width * sc, h = im.height * sc; ih = Math.max(ih, h); var xx = rtl ? W - M - (i + 1) * slot - i * 16 + (slot - w) : M + i * (slot + 16); g.drawImage(im, xx, y, w, h); g.strokeStyle = '#cbd5e1'; g.lineWidth = 2; g.strokeRect(xx, y, w, h); });
+      y += ih + 30;
+    }
+    // pied
+    g.fillStyle = '#e2e8f0'; g.fillRect(M, y, W - 2 * M, 2); tx(rt('gen', lg) + ' · ' + K.fmtDate(K.today()), M, y + 34, { s: 16, c: '#94a3b8' });
+    var outC = document.createElement('canvas'); outC.width = W; outC.height = y + 60; outC.getContext('2d').drawImage(cv, 0, 0);
+    return outC;
+  });
+}
+// PDF minimal (une page, image JPEG)
+function pdfFromCanvas(cv) {
+  var jpg = atob(cv.toDataURL('image/jpeg', 0.9).split(',')[1]), pw = 595.28, ph = pw * cv.height / cv.width;
+  var enc = function (s) { var a = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) a[i] = s.charCodeAt(i) & 255; return a; };
+  var parts = [], off = [], len = 0, push = function (s) { var b = typeof s === 'string' ? enc(s) : s; parts.push(b); len += b.length; };
+  var content = 'q ' + pw.toFixed(2) + ' 0 0 ' + ph.toFixed(2) + ' 0 0 cm /Im0 Do Q';
+  push('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n');
+  off[1] = len; push('1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n');
+  off[2] = len; push('2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n');
+  off[3] = len; push('3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 ' + pw.toFixed(2) + ' ' + ph.toFixed(2) + ']/Resources<</XObject<</Im0 4 0 R>>>>/Contents 5 0 R>>endobj\n');
+  off[4] = len; push('4 0 obj<</Type/XObject/Subtype/Image/Width ' + cv.width + '/Height ' + cv.height + '/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length ' + jpg.length + '>>stream\n'); push(enc(jpg)); push('\nendstream endobj\n');
+  off[5] = len; push('5 0 obj<</Length ' + content.length + '>>stream\n' + content + '\nendstream endobj\n');
+  var xr = len, x = 'xref\n0 6\n0000000000 65535 f \n'; for (var i = 1; i <= 5; i++) x += ('0000000000' + off[i]).slice(-10) + ' 00000 n \n';
+  push(x + 'trailer<</Size 6/Root 1 0 R>>\nstartxref\n' + xr + '\n%%EOF');
+  return new Blob(parts, { type: 'application/pdf' });
+}
+function fileName(src, ext) { return ('Wathba_' + swName(src.sid) + '_' + src.cfg.dist + 'm_' + src.date).replace(/[^\w؀-ۿ.-]+/g, '_') + '.' + ext; }
+function sendBlob(blob, name) {
+  var f = null; try { f = new File([blob], name, { type: blob.type }); } catch (e) {}
+  if (f && navigator.canShare && navigator.canShare({ files: [f] })) return navigator.share({ files: [f], title: name }).catch(function () {});
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+}
+function openReport(src) {
+  var lg = L(), box = document.createElement('div'); box.id = 'repbox';
+  box.innerHTML = '<div class="rep-in card"><div class="row" style="margin-bottom:10px"><b class="sp">' + rt('report', lg) + '</b><label class="small muted" style="margin:0">' + rt('lang', lg) + '</label><select id="replg" style="width:auto"><option value="ar">العربية</option><option value="fr">Français</option></select><button class="btn pri sm" id="repimg">' + rt('img', lg) + '</button><button class="btn pri sm" id="reppdf">' + rt('pdf', lg) + '</button><button class="btn sm" id="repx">✕</button></div><div id="repview" class="rep-view">…</div></div>';
+  document.body.appendChild(box); $('#replg').value = lg;
+  var cur = null, draw = function () { $('#repview').innerHTML = '…'; drawReport(src, $('#replg').value).then(function (cv) { cur = cv; cv.style.width = '100%'; cv.style.height = 'auto'; $('#repview').innerHTML = ''; $('#repview').appendChild(cv); }); };
+  draw();
+  $('#replg').onchange = draw;
+  $('#repx').onclick = function () { box.remove(); };
+  box.onclick = function (e) { if (e.target === box) box.remove(); };
+  $('#repimg').onclick = function () { if (cur) cur.toBlob(function (b) { sendBlob(b, fileName(src, 'png')); }, 'image/png'); };
+  $('#reppdf').onclick = function () { if (cur) sendBlob(pdfFromCanvas(cur), fileName(src, 'pdf')); };
+}
+function curSrc() { return { id: VS.id, sid: VS.cfg.sid, date: VS.cfg.date || K.today(), cfg: VS.cfg, ev: VS.ev }; }
+function recSrc(rec) { return { id: rec.id, sid: rec.swimmerId, date: rec.date, cfg: Object.assign(defCfg(), rec.data.cfg || {}), ev: (rec.data.ev || []).map(function (e) { return { k: e.k, t: e.t, d: e.d }; }) }; }
+
+/* ================= deux longueurs d'une même vidéo ================= */
+function lapStarts(c, evs) { var ev = evs.slice().sort(function (a, b) { return a.t - b.t; }), sig = ev.find(function (e) { return e.k === 'S'; }), w = ev.filter(function (e) { return e.k === 'W' || e.k === 'F'; }), o = [sig ? sig.t : (ev[0] ? ev[0].t : 0)]; for (var i = 1; i < laps(c); i++) o.push(w[i - 1] ? w[i - 1].t : null); return o; }
+function lapCmpHtml() {
+  var n = laps(VS.cfg), lg = L(); if (!VS.url || n < 2) return '';
+  var opt = function (sel) { var s = ''; for (var i = 1; i <= n; i++) s += '<option value="' + i + '"' + (i === sel ? ' selected' : '') + '>' + rt('lap', lg) + ' ' + i + '</option>'; return s; };
+  return '<div class="card"><h3>' + rt('lapCmp', lg) + '</h3><p class="small muted">' + rt('lapCmpH', lg) + '</p><div class="va-dual"><div><label class="small">' + rt('paneA', lg) + '</label><select id="lcA">' + opt(1) + '</select><video id="lv0" src="' + VS.url + '" playsinline preload="auto" muted></video></div><div><label class="small">' + rt('paneB', lg) + '</label><select id="lcB">' + opt(n) + '</select><video id="lv1" src="' + VS.url + '" playsinline preload="auto" muted></video></div></div>' +
+    '<div class="row" style="margin-top:8px;gap:6px;direction:ltr"><button class="btn sm" id="lsync">' + rt('syncL', lg) + '</button><button class="btn sm" data-ls="-1">◀</button><button class="btn pri sm" id="lplay">▶</button><button class="btn sm" data-ls="1">▶</button><select id="lrate" style="width:auto;min-height:34px">' + [0.1, 0.25, 0.5, 1].map(function (r) { return '<option value="' + r + '"' + (r === 0.25 ? ' selected' : '') + '>×' + r + '</option>'; }).join('') + '</select></div></div>';
+}
+function bindLapCmp() {
+  var a = $('#lv0'), b = $('#lv1'); if (!a || !b) return;
+  var vids = [a, b];
+  var sync = function () { var st = lapStarts(VS.cfg, VS.ev), ia = +$('#lcA').value - 1, ib = +$('#lcB').value - 1; vids.forEach(function (v) { v.pause(); }); if (st[ia] != null) seekV(a, st[ia]); if (st[ib] != null) seekV(b, st[ib]); $('#lplay').textContent = '▶'; };
+  vids.forEach(function (v) { v.playbackRate = 0.25; v.addEventListener('loadedmetadata', sync, { once: true }); });
+  $('#lsync').onclick = sync; $('#lcA').onchange = sync; $('#lcB').onchange = sync;
+  $('#lplay').onclick = function () { var p = vids.some(function (v) { return v.paused; }); vids.forEach(function (v) { if (p) v.play(); else v.pause(); }); this.textContent = p ? '⏸' : '▶'; };
+  $('#lrate').onchange = function () { var r = +this.value; vids.forEach(function (v) { v.playbackRate = r; }); };
+  $$('[data-ls]').forEach(function (bt) { bt.onclick = function () { vids.forEach(function (v) { v.pause(); seekV(v, (v._tgt != null ? v._tgt : v.currentTime) + (+bt.dataset.ls) / (VS.fps || 30)); }); }; });
+}
 
 /* ---------- nageurs ---------- */
 function swHtml() {
