@@ -114,6 +114,7 @@ function anaHtml() {
     '<select id="rate" style="width:auto;min-height:34px">' + [0.1, 0.25, 0.5, 1].map(function (r) { return '<option value="' + r + '"' + (r === 0.25 ? ' selected' : '') + '>×' + r + '</option>'; }).join('') + '</select>' +
     '<span class="sp"></span><span class="mono ltr" id="tdisp" style="font-weight:700">0.00</span><span class="chip ltr" id="fpsd"></span><button class="btn sm" id="angb">' + T('angle') + '</button><button class="btn sm" id="snap">' + T('snap') + '</button><label class="btn sm" style="margin:0">📂<input type="file" id="vfile2" accept="video/*" hidden></label></div>' +
     '<div class="small muted" dir="auto" style="margin-top:6px;text-align:start">' + T('keys') + '</div></div></div>';
+  if (VS.url) h += '<div class="card va-evc"><div class="row" style="margin-bottom:6px"><h3 style="margin:0">' + T('lap') + ' <span id="lapn" class="chip ltr" dir="ltr">1</span></h3><span class="sp small muted">' + T('evHelp') + '</span></div><div class="va-btns" id="evbtns"></div></div>';
   h += '<div class="card" id="vres"></div></div>';
   // panneau
   h += '<div class="va-side"><div class="card"><div class="f"><label>' + T('vaSw') + '</label><select data-vc="sid"><option value="">— ' + T('needSw') + ' —</option>' + sws.map(function (s) { return '<option value="' + s.id + '"' + (c.sid === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('') + '</select></div>' +
@@ -123,7 +124,6 @@ function anaHtml() {
     '<div class="fr"><div class="f"><label>' + T('vaSlow') + '</label>' + sel('slow', [[1, T('slow1')], [2, 'Slow ×2'], [4, 'Slow ×4'], [8, 'Slow ×8']], c.slow) + '</div><div class="f"><label>' + T('vaFps') + '</label><select id="fpssel">' + [['auto', T('vaAuto')], [25, 25], [30, 30], [50, 50], [60, 60], [120, 120], [240, 240]].map(function (o) { return '<option value="' + o[0] + '"' + ((VS.fpsAuto && o[0] === 'auto') || (!VS.fpsAuto && +o[0] === VS.fps) ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div></div>' +
     '<div class="f"><input data-vc="label" placeholder="' + esc(T('vaLabel')) + '" value="' + esc(c.label) + '"></div>' +
     '<div class="f" style="margin:0"><label>' + T('notes') + '</label><textarea data-vc="notes" rows="3" placeholder="' + esc(T('notesP')) + '">' + esc(c.notes || '') + '</textarea></div></div>';
-  h += '<div class="card"><div class="row"><h3 class="sp" style="margin:0">' + T('lap') + ' <span id="lapn" class="chip ltr" dir="ltr">1</span></h3></div><div class="va-btns" id="evbtns"></div><p class="small muted" style="margin:6px 0 0">' + T('evHelp') + '</p></div>';
   h += '<div class="card"><h3>' + T('events') + '</h3><div id="evlist" class="va-evl"></div><div class="row" style="margin-top:10px;flex-wrap:wrap"><button class="btn pri" id="vsave">' + T('saveVa') + '</button><button class="btn sm" id="vnew">' + T('newVa') + '</button></div></div></div></div>';
   return h;
 }
@@ -137,7 +137,7 @@ function renderBtns() {
   b.push([lap === n ? 'F' : 'W', lap === n ? T('evF') : T('evW'), 'W']);
   b.push(['C', T('evC'), 'C']);
   box.innerHTML = b.map(function (x) { return '<button class="btn' + (x[0] === 'C' ? ' cyc' : x[0] === 'W' || x[0] === 'F' ? ' wall' : '') + '" data-ev="' + x[0] + '">' + x[1] + '<kbd>' + x[2] + '</kbd></button>'; }).join('');
-  $('#lapn').textContent = lap + ' / ' + n;
+  if ($('#lapn')) $('#lapn').textContent = lap + ' / ' + n;
   $$('[data-ev]', box).forEach(function (bt) { bt.onclick = function () { addEv(bt.dataset.ev); }; });
 }
 function addEv(code) {
@@ -202,7 +202,22 @@ function bindAna() {
   $$('[data-st]').forEach(function (b) { b.onclick = function () { step(+b.dataset.st); }; });
   vid.onclick = function () { if (!VS.angle) play.click(); };
   // fps auto
-  if (vid.requestVideoFrameCallback) { var last = null, ds = []; var cb = function (now, md) { if (last != null) { var d = md.mediaTime - last; if (d > 0.001 && d < 0.2) ds.push(d); } last = md.mediaTime; if (ds.length > 30) ds.shift(); if (VS.fpsAuto && ds.length >= 8) { var s = ds.slice().sort(), m = s[Math.floor(s.length / 2)]; VS.fps = Math.round(1 / m); showFps(); } vid.requestVideoFrameCallback(cb); }; vid.requestVideoFrameCallback(cb); }
+  if (vid.requestVideoFrameCallback) {
+    var last = null, ds = [];
+    vid.addEventListener('seeking', function () { last = null; });
+    vid.addEventListener('pause', function () { last = null; });
+    var cb = function (now, md) {
+      if (!vid.paused && !vid.seeking && last && md.presentedFrames > last.f) {
+        var df = md.presentedFrames - last.f, dt = md.mediaTime - last.t;
+        if (dt > 0.001 && dt < 0.5 && df <= 3) ds.push(dt / df);
+      }
+      last = vid.paused ? null : { f: md.presentedFrames, t: md.mediaTime };
+      if (ds.length > 40) ds.shift();
+      if (VS.fpsAuto && ds.length >= 10) { var q = ds.slice().sort(function (a, b) { return a - b; }), m = q[Math.floor(q.length * 0.3)], f = Math.round(1 / m); var std = [24, 25, 30, 50, 60, 120, 240].reduce(function (b, x) { return Math.abs(x - f) < Math.abs(b - f) ? x : b; }, 30); VS.fps = Math.abs(std - f) <= 3 ? std : f; showFps(); }
+      vid.requestVideoFrameCallback(cb);
+    };
+    vid.requestVideoFrameCallback(cb);
+  }
   showFps();
   // angle
   $('#snap').onclick = function () {

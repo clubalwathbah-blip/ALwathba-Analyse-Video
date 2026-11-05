@@ -141,3 +141,6 @@ html[dir="rtl"] .va-k:before{inset:0 0 0 auto}
 @media(max-width:700px){main{padding:12px}.hd{padding:8px 12px}.hbtn .lbl{display:none}}
 .auth-card #api{letter-spacing:0;font-size:13px;text-align:start}
 .va-k small,.num small{font-family:var(--font);letter-spacing:0}
+.va-evc{padding:12px 14px}
+.va-evc .va-btns{grid-template-columns:repeat(auto-fit,minmax(92px,1fr));margin-top:0}
+.va-evc .va-btns .btn{min-height:52px;font-size:15px}
