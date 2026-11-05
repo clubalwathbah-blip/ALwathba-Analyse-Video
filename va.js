@@ -151,9 +151,9 @@ function refresh() {
   var c = VS.cfg, f = +c.slow || 1, ev = VS.ev.slice().sort(function (a, b) { return a.t - b.t; }), sig = ev.find(function (e) { return e.k === 'S'; }), t0 = sig ? sig.t : (ev[0] ? ev[0].t : 0);
   var r = compute(c, VS.ev);
   $('#evlist').innerHTML = ev.length ? '<table>' + ev.map(function (e) { var i = VS.ev.indexOf(e); return '<tr data-seek="' + e.t + '"><td class="mono ltr">' + F((e.t - t0) / f, 2) + '</td><td style="text-align:start"><b>' + esc(evLabel(e)) + '</b></td><td class="small muted">' + T('lap') + ' ' + e.lap + '</td><td><button class="btn sm" data-del="' + i + '">✕</button></td></tr>'; }).join('') + '</table>' + (sig ? '' : '<p class="small" style="color:var(--warn)">' + T('noSig') + '</p>') : '<p class="muted small">' + T('noEv') + '</p>';
-  $$('#evlist [data-seek]').forEach(function (tr) { tr.onclick = function (e) { if (e.target.dataset.del != null) return; var v = $('#vid'); if (v) v.currentTime = +tr.dataset.seek; }; });
+  $$('#evlist [data-seek]').forEach(function (tr) { tr.onclick = function (e) { if (e.target.dataset.del != null) return; var v = $('#vid'); if (v) { v.pause(); seekV(v, +tr.dataset.seek); } }; });
   $$('#evlist [data-del]').forEach(function (b) { b.onclick = function () { VS.ev.splice(+b.dataset.del, 1); VS.dirty = true; refresh(); }; });
-  var tl = $('#vtl'), vd = $('#vid'); if (tl && vd && vd.duration) { tl.innerHTML = ev.map(function (e) { return '<i class="' + e.k + '" data-tt="' + e.t + '" title="' + esc(evLabel(e)) + '" style="left:' + (e.t / vd.duration * 100).toFixed(3) + '%"></i>'; }).join(''); $$('#vtl i').forEach(function (x) { x.onclick = function () { vd.currentTime = +x.dataset.tt; }; }); }
+  var tl = $('#vtl'), vd = $('#vid'); if (tl && vd && vd.duration) { tl.innerHTML = ev.map(function (e) { return '<i class="' + e.k + '" data-tt="' + e.t + '" title="' + esc(evLabel(e)) + '" style="left:' + (e.t / vd.duration * 100).toFixed(3) + '%"></i>'; }).join(''); $$('#vtl i').forEach(function (x) { x.onclick = function () { vd.pause(); seekV(vd, +x.dataset.tt); }; }); }
   $('#vres').innerHTML = resHtml(r, c);
   drawChart(r, 'vch');
 }
@@ -192,11 +192,11 @@ function bindAna() {
   var vid = $('#vid'); if (!vid || !VS.url) return;
   vid.playbackRate = 0.25;
   var seek = $('#seek'), play = $('#play');
-  var upd = function () { if (!document.body.contains(vid) || !$('#tdisp')) return; VS.keepT = vid.currentTime; var d = vid.duration || 1; seek.value = Math.round(vid.currentTime / d * 1000); var ev = VS.ev.find(function (e) { return e.k === 'S'; }); $('#tdisp').textContent = (ev ? ((vid.currentTime - ev.t) / (+c.slow || 1)) : vid.currentTime).toFixed(2) + ' s'; renderBtnsLite(); };
+  var upd = function () { if (!document.body.contains(vid) || !$('#tdisp')) return; VS.keepT = vid.currentTime; var d = vid.duration || 1; if (document.activeElement !== seek) seek.value = Math.round(vid.currentTime / d * 1000); var ev = VS.ev.find(function (e) { return e.k === 'S'; }); $('#tdisp').textContent = (ev ? ((vid.currentTime - ev.t) / (+c.slow || 1)) : vid.currentTime).toFixed(2) + ' s'; renderBtnsLite(); };
   vid.addEventListener('timeupdate', upd); vid.addEventListener('seeked', upd); vid.addEventListener('loadedmetadata', function () { if (VS.keepT) vid.currentTime = VS.keepT; upd(); sizeOv(); refresh(); });
   vid.addEventListener('play', function () { play.textContent = '⏸'; }); vid.addEventListener('pause', function () { play.textContent = '▶'; });
   vid.addEventListener('loadeddata', sizeOv);
-  seek.oninput = function () { vid.currentTime = (vid.duration || 0) * seek.value / 1000; };
+  seek.oninput = function () { vid.pause(); seekV(vid, (vid.duration || 0) * seek.value / 1000); };
   play.onclick = function () { if (vid.paused) vid.play(); else vid.pause(); };
   $('#rate').onchange = function () { vid.playbackRate = +this.value; };
   $$('[data-st]').forEach(function (b) { b.onclick = function () { step(+b.dataset.st); }; });
@@ -243,7 +243,16 @@ function bindAna() {
 }
 var lastLapShown = 0;
 function renderBtnsLite() { var l = curLap(); if (l !== lastLapShown) { lastLapShown = l; renderBtns(); } }
-function step(n) { var vid = $('#vid'); if (!vid) return; vid.pause(); vid.currentTime = Math.max(0, Math.min(vid.duration || 0, vid.currentTime + n / (VS.fps || 30))); }
+// déplacement « sûr » : une seule recherche à la fois (les téléphones bloquent si on en empile)
+function seekV(v, t) {
+  if (!v) return; t = Math.max(0, Math.min((v.duration || 0) - 0.001, t));
+  v._tgt = t;
+  if (v.seeking || v._busy) return;
+  v._busy = true; v.currentTime = t;
+  if (!v._sk) { v._sk = true; v.addEventListener('seeked', function () { v._busy = false; if (v._tgt != null && Math.abs(v._tgt - v.currentTime) > 0.0005) { var n = v._tgt; v._tgt = null; seekV(v, n); } else v._tgt = null; }); }
+  clearTimeout(v._wd); v._wd = setTimeout(function () { v._busy = false; }, 1500);
+}
+function step(n) { var vid = $('#vid'); if (!vid) return; vid.pause(); var base = vid._tgt != null ? vid._tgt : vid.currentTime; seekV(vid, base + n / (VS.fps || 30)); }
 function showFps() { var el = $('#fpsd'); if (el) el.textContent = (VS.fpsAuto ? 'auto ' : '') + VS.fps + ' img/s'; }
 function sizeOv() { var v = $('#vid'), o = $('#ov'); if (!v || !o) return; o.width = v.clientWidth; o.height = v.clientHeight; drawOv(); }
 function drawOv() {
@@ -320,10 +329,10 @@ function bindCmp() {
   var vids = [$('#dv0'), $('#dv1')].filter(Boolean);
   var sigOf = function (r) { var s = (r.data.ev || []).find(function (e) { return e.k === 'S'; }); return s ? s.t : 0; };
   vids.forEach(function (v) { v.playbackRate = 0.25; });
-  $('#dsync').onclick = function () { [$('#dv0'), $('#dv1')].forEach(function (v, i) { if (v) { v.pause(); v.currentTime = sigOf(P[i]); } }); };
+  $('#dsync').onclick = function () { [$('#dv0'), $('#dv1')].forEach(function (v, i) { if (v) { v.pause(); seekV(v, sigOf(P[i])); } }); };
   $('#dplay').onclick = function () { var anyPaused = vids.some(function (v) { return v.paused; }); vids.forEach(function (v) { if (anyPaused) v.play(); else v.pause(); }); this.textContent = anyPaused ? '⏸' : '▶'; };
   $('#drate').onchange = function () { var r = +this.value; vids.forEach(function (v) { v.playbackRate = r; }); };
-  $$('[data-ds]').forEach(function (b) { b.onclick = function () { vids.forEach(function (v) { v.pause(); v.currentTime = Math.max(0, v.currentTime + (+b.dataset.ds) / 30); }); }; });
+  $$('[data-ds]').forEach(function (b) { b.onclick = function () { vids.forEach(function (v) { v.pause(); seekV(v, (v._tgt != null ? v._tgt : v.currentTime) + (+b.dataset.ds) / 30); }); }; });
 }
 
 /* ---------- section fiche nageur ---------- */
@@ -366,4 +375,3 @@ function bindSw() {
 window.BTV.views.btVideo = vVideo;
 window.BTV.video = { section: swimmerSection, bind: bindSwimmerSection, compute: compute };
 })();
-
