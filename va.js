@@ -29,7 +29,7 @@ Object.assign(K.D, {
 });
 
 var STROKES = [['NL', ['حرة', 'Nage libre']], ['DOS', ['ظهر', 'Dos']], ['BRA', ['صدر', 'Brasse']], ['PAP', ['فراشة', 'Papillon']], ['4N', ['متنوعة', '4 nages']]];
-var VS = { tab: 'new', url: null, fname: '', cfg: null, ev: [], dirty: false, id: null, sel: [], fps: 30, fpsAuto: true, angle: false, pts: [], cmp: null };
+var VS = { tab: 'new', url: null, fname: '', cfg: null, ev: [], dirty: false, id: null, sel: [], fps: 30, fpsAuto: true, angle: false, pts: [], cmp: null, z: null, z2: null, tool: null, mode: 'race', meas: [], cal: null, trk: [], mimg: {}, trkStep: 1 };
 function defCfg() { return { sid: '', date: K.today(), ctx: 'train', label: '', pool: 25, dist: 50, stroke: 'NL', start: 'dive', slow: 1 }; }
 function markers(pool) { return +pool === 50 ? [5, 10, 15, 25, 35, 40, 45] : [5, 10, 15, 20]; }
 function laps(c) { return Math.max(1, Math.round(c.dist / c.pool)); }
@@ -108,14 +108,14 @@ function anaHtml() {
   var sel = function (k, opts, cur) { return '<select data-vc="' + k + '">' + opts.map(function (o) { return '<option value="' + o[0] + '"' + (String(cur) === String(o[0]) ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>'; };
   var h = '<div class="va-grid"><div class="va-left">';
   h += '<div class="card va-vid" id="drop">' + (VS.url ? '' : '<div class="va-empty"><label class="btn pri big">' + T('vaOpen') + '<input type="file" id="vfile" accept="video/*" hidden></label><p class="small muted">' + T('vaDrop') + '</p>' + (VS.id && VS.fname ? '<p class="small"><b>' + T('reopenHint') + ' : </b><span class="ltr">' + esc(VS.fname) + '</span></p>' : '') + '</div>') +
-    '<div class="va-stage' + (VS.url ? '' : ' hide') + '"><video id="vid" playsinline preload="auto"' + (VS.url ? ' src="' + VS.url + '"' : '') + '></video><canvas id="ov"></canvas></div>' +
+    '<div class="va-stage' + (VS.url ? '' : ' hide') + '" id="stage"><div class="va-zm" id="zm"><video id="vid" playsinline preload="auto"' + (VS.url ? ' src="' + VS.url + '"' : '') + '></video><canvas id="ov"></canvas></div>' + zoomUi() + '</div>' +
     '<div class="va-ctl' + (VS.url ? '' : ' hide') + '"><div class="va-seekw"><div class="va-tl" id="vtl"></div><input type="range" id="seek" min="0" max="1000" value="0" class="va-seek"></div>' +
     '<div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn sm" data-st="-30">«</button><button class="btn sm" data-st="-10">◀◀</button><button class="btn sm" data-st="-1">◀</button><button class="btn pri sm" id="play" style="min-width:56px">▶</button><button class="btn sm" data-st="1">▶</button><button class="btn sm" data-st="10">▶▶</button><button class="btn sm" data-st="30">»</button>' +
     '<select id="rate" style="width:auto;min-height:34px">' + [0.1, 0.25, 0.5, 1].map(function (r) { return '<option value="' + r + '"' + (r === 0.25 ? ' selected' : '') + '>×' + r + '</option>'; }).join('') + '</select>' +
-    '<span class="sp"></span><span class="mono ltr" id="tdisp" style="font-weight:700">0.00</span><span class="chip ltr" id="fpsd"></span><button class="btn sm" id="angb">' + T('angle') + '</button><button class="btn sm" id="snap">' + T('snap') + '</button><label class="btn sm" style="margin:0">📂<input type="file" id="vfile2" accept="video/*" hidden></label></div>' +
-    '<div class="small muted" dir="auto" style="margin-top:6px;text-align:start">' + T('keys') + '</div></div></div>';
-  if (VS.url) h += '<div class="card va-evc"><div class="row" style="margin-bottom:6px"><h3 style="margin:0">' + T('lap') + ' <span id="lapn" class="chip ltr" dir="ltr">1</span></h3><span class="sp small muted">' + T('evHelp') + '</span></div><div class="va-btns" id="evbtns"></div></div>';
-  h += '<div class="card" id="vres"></div><div id="vlc">' + lapCmpHtml() + '</div></div>';
+    '<span class="sp"></span><span class="mono ltr" id="tdisp" style="font-weight:700">0.00</span><span class="chip ltr" id="fpsd"></span><button class="btn sm" id="snap">' + T('snap') + '</button><label class="btn sm" style="margin:0">📂<input type="file" id="vfile2" accept="video/*" hidden></label></div>' +
+    toolBar() + '<div class="small muted" dir="auto" style="margin-top:6px;text-align:start">' + T('keys') + '</div></div></div>';
+  if (VS.url) h += '<div class="card va-evc"><div class="row" style="margin-bottom:6px">' + modeTabs() + '<h3 style="margin:0">' + T('lap') + ' <span id="lapn" class="chip ltr" dir="ltr">1</span></h3><span class="sp small muted" id="evhelp">' + T('evHelp') + '</span></div><div class="va-btns" id="evbtns"></div></div>';
+  h += '<div class="card" id="vres"></div><div id="vpro"></div><div id="vlc">' + lapCmpHtml() + '</div></div>';
   // panneau
   h += '<div class="va-side"><div class="card"><div class="f"><label>' + T('vaSw') + '</label><select data-vc="sid"><option value="">— ' + T('needSw') + ' —</option>' + sws.map(function (s) { return '<option value="' + s.id + '"' + (c.sid === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('') + '</select></div>' +
     '<div class="fr"><div class="f"><label>' + T('date') + '</label><input type="date" data-vc="date" value="' + c.date + '"></div><div class="f"><label>' + T('vaCtx') + '</label>' + sel('ctx', [['train', T('vaTrain')], ['comp', T('vaComp')]], c.ctx) + '</div></div>' +
@@ -128,18 +128,6 @@ function anaHtml() {
   return h;
 }
 function curLap() { var vid = $('#vid'), t = vid ? vid.currentTime : 0, n = laps(VS.cfg), w = VS.ev.filter(function (e) { return (e.k === 'W' || e.k === 'F') && e.t <= t + 1e-6; }).length; return Math.min(n, w + 1); }
-function renderBtns() {
-  var box = $('#evbtns'); if (!box) return;
-  var lap = curLap(), n = laps(VS.cfg), c = VS.cfg, b = [];
-  if (lap === 1) { b.push(['S', T('evS'), 'S']); if (c.start !== 'push') b.push(['O', T('evO'), 'O']); }
-  b.push(['B', T('evB'), 'B']);
-  markers(c.pool).forEach(function (d, i) { b.push(['M' + d, mU(d), String(i + 1)]); });
-  b.push([lap === n ? 'F' : 'W', lap === n ? T('evF') : T('evW'), 'W']);
-  b.push(['C', T('evC'), 'C']);
-  box.innerHTML = b.map(function (x) { return '<button class="btn' + (x[0] === 'C' ? ' cyc' : x[0] === 'W' || x[0] === 'F' ? ' wall' : '') + '" data-ev="' + x[0] + '">' + x[1] + '<kbd>' + x[2] + '</kbd></button>'; }).join('');
-  if ($('#lapn')) $('#lapn').textContent = lap + ' / ' + n;
-  $$('[data-ev]', box).forEach(function (bt) { bt.onclick = function () { addEv(bt.dataset.ev); }; });
-}
 function addEv(code) {
   var vid = $('#vid'); if (!vid || !VS.url) return;
   var t = vid.currentTime, e = code.charAt(0) === 'M' ? { k: 'M', d: +code.slice(1), t: t } : { k: code, t: t };
@@ -157,6 +145,7 @@ function refresh() {
   $('#vres').innerHTML = aidHtml(c, VS.ev, r) + resHtml(r, c);
   bindAid();
   drawChart(r, 'vch');
+  refreshRes();
 }
 function kpi(l, v, u, hk) { return '<div class="kbox va-k"><div class="small muted">' + l + '</div><div class="num" style="font-size:22px;font-weight:800"><span dir="ltr">' + v + (u ? ' <small class="muted">' + u + '</small>' : '') + '</span></div>' + (hk ? '<div class="va-hint">' + rt('x_' + hk, L()) + '</div>' : '') + '</div>'; }
 function resHtml(r, c) {
@@ -190,7 +179,7 @@ function bindAna() {
   $('#vsave').onclick = saveVa;
   $('#vrep').onclick = function () { if (!VS.ev.length) { K.toast(T('noEv')); return; } if (!VS.cfg.sid) { K.toast(T('needSw')); return; } openReport(curSrc()); };
   bindLapCmp();
-  $('#vnew').onclick = function () { if (VS.dirty && !confirm(T('unsaved'))) return; VS.id = null; VS.ev = []; VS.snaps = []; VS.dirty = false; VS.cfg = Object.assign(defCfg(), { sid: c.sid, date: c.date, ctx: c.ctx, pool: c.pool, dist: c.dist, stroke: c.stroke, start: c.start, slow: c.slow }); K.render(); };
+  $('#vnew').onclick = function () { if (VS.dirty && !confirm(T('unsaved'))) return; VS.id = null; VS.ev = []; VS.snaps = []; VS.meas = []; VS.trk = []; VS.mimg = {}; VS.dirty = false; VS.cfg = Object.assign(defCfg(), { sid: c.sid, date: c.date, ctx: c.ctx, pool: c.pool, dist: c.dist, stroke: c.stroke, start: c.start, slow: c.slow }); K.render(); };
   refresh();
   var vid = $('#vid'); if (!vid || !VS.url) return;
   vid.playbackRate = 0.25;
@@ -203,7 +192,9 @@ function bindAna() {
   play.onclick = function () { if (vid.paused) vid.play(); else vid.pause(); };
   $('#rate').onchange = function () { vid.playbackRate = +this.value; };
   $$('[data-st]').forEach(function (b) { b.onclick = function () { step(+b.dataset.st); }; });
-  vid.onclick = function () { if (!VS.angle) play.click(); };
+  VS.z = VS.z || { s: 1, x: 0, y: 0 };
+  var ZM = zoomable([$('#stage')], [$('#zm')], VS.z, function () { if (!VS.tool) play.click(); }); bindZoomUi($('#stage'), ZM);
+  vid.addEventListener('loadedmetadata', function () { ZM.apply(); });
   // fps auto
   if (vid.requestVideoFrameCallback) {
     var last = null, ds = [];
@@ -224,13 +215,17 @@ function bindAna() {
   showFps();
   // angle
   $('#snap').onclick = function () {
-    var cv = document.createElement('canvas'), o = $('#ov'); cv.width = vid.videoWidth; cv.height = vid.videoHeight; var g = cv.getContext('2d'); g.drawImage(vid, 0, 0);
-    if (o && o.width) g.drawImage(o, 0, 0, cv.width, cv.height);
+    var cv = document.createElement('canvas'), o = $('#ov'), z = VS.z || { s: 1, x: 0, y: 0 }, zm = $('#zm'), W = zm.offsetWidth, H = zm.offsetHeight;
+    var vx0 = vid.offsetLeft, vy0 = vid.offsetTop, vw = vid.clientWidth, vh = vid.clientHeight, kx = vid.videoWidth / vw, ky = vid.videoHeight / vh;
+    var ax = Math.max(0, -z.x / z.s - vx0), ay = Math.max(0, -z.y / z.s - vy0), bx = Math.min(vw, (W - z.x) / z.s - vx0), by = Math.min(vh, (H - z.y) / z.s - vy0);
+    var sw = Math.max(1, bx - ax), sh = Math.max(1, by - ay);
+    cv.width = Math.round(sw * kx); cv.height = Math.round(sh * ky); var g = cv.getContext('2d'); g.drawImage(vid, ax * kx, ay * ky, sw * kx, sh * ky, 0, 0, cv.width, cv.height);
+    if (o && o.width) g.drawImage(o, ax, ay, sw, sh, 0, 0, cv.width, cv.height);
     try { var tw = Math.min(640, cv.width), tc = document.createElement('canvas'); tc.width = tw; tc.height = Math.round(cv.height * tw / cv.width); tc.getContext('2d').drawImage(cv, 0, 0, tc.width, tc.height); VS.snaps = (VS.snaps || []).concat([tc.toDataURL('image/jpeg', 0.75)]).slice(-3); VS.dirty = true; } catch (e) {}
     var a = document.createElement('a'); a.href = cv.toDataURL('image/png'); a.download = (swName(c.sid) || 'nageur').replace(/\s+/g, '_') + '_' + (c.date || K.today()) + '_' + vid.currentTime.toFixed(2) + 's.png'; a.click();
   };
-  $('#angb').onclick = function () { VS.angle = !VS.angle; VS.pts = []; this.classList.toggle('pri', VS.angle); $('#ov').style.pointerEvents = VS.angle ? 'auto' : 'none'; drawOv(); if (VS.angle) { vid.pause(); K.toast(T('angleHelp')); } };
-  $('#ov').onclick = function (e) { var r = this.getBoundingClientRect(); if (VS.pts.length >= 3) VS.pts = []; VS.pts.push({ x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height }); drawOv(); };
+  bindTools(); bindModes(); $('#ov').addEventListener('click', onOvClick); $('#ov').style.pointerEvents = VS.tool ? 'auto' : 'none';
+  vid.addEventListener('seeked', drawOv); vid.addEventListener('pause', drawOv);
   window.addEventListener('resize', sizeOv);
   // clavier
   document.onkeydown = function (e) {
@@ -241,8 +236,9 @@ function bindAna() {
     else if (k === 'ArrowRight' || k === 'ArrowLeft') { e.preventDefault(); var s = (k === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 10 : 1); if (L() !== 'fr' && !e.altKey) s = s; step(s); }
     else if (/^[sS]$/.test(k)) addEv('S'); else if (/^[oO]$/.test(k)) addEv('O'); else if (/^[bB]$/.test(k)) addEv('B'); else if (/^[cC]$/.test(k)) addEv('C');
     else if (/^[wW]$/.test(k)) addEv(curLap() === laps(c) ? 'F' : 'W');
-    else if (/^[zZ]$/.test(k)) { if (VS.ev.length) { VS.ev.pop(); VS.dirty = true; refresh(); } }
-    else if (/^[1-9]$/.test(k)) { var mk = markers(c.pool)[+k - 1]; if (mk) addEv('M' + mk); }
+    else if (/^[zZ]$/.test(k)) { if (VS.tool && VS.pts.length) { VS.pts.pop(); drawOv(); } else if (VS.tool === 'trk' && VS.trk && VS.trk.length) { VS.trk.pop(); refreshRes(); drawOv(); } else if (VS.ev.length) { VS.ev.pop(); VS.dirty = true; refresh(); } }
+    else if (/^[1-9]$/.test(k)) { var mk = (VS.keymap || {})[k]; if (mk) addEv(mk); }
+    else if (k === 'Escape' && VS.tool) setTool(VS.tool);
   };
 }
 var lastLapShown = 0;
@@ -258,32 +254,22 @@ function seekV(v, t) {
 }
 function step(n) { var vid = $('#vid'); if (!vid) return; vid.pause(); var base = vid._tgt != null ? vid._tgt : vid.currentTime; seekV(vid, base + n / (VS.fps || 30)); }
 function showFps() { var el = $('#fpsd'); if (el) el.textContent = (VS.fpsAuto ? 'auto ' : '') + VS.fps + ' img/s'; }
-function sizeOv() { var v = $('#vid'), o = $('#ov'); if (!v || !o) return; o.width = v.clientWidth; o.height = v.clientHeight; drawOv(); }
-function drawOv() {
-  var o = $('#ov'); if (!o) return; var g = o.getContext('2d'); g.clearRect(0, 0, o.width, o.height);
-  if (!VS.angle || !VS.pts.length) return;
-  var P = VS.pts.map(function (p) { return { x: p.x * o.width, y: p.y * o.height }; });
-  g.strokeStyle = '#ffe14d'; g.fillStyle = '#ffe14d'; g.lineWidth = 3;
-  g.beginPath(); P.forEach(function (p, i) { if (i) g.lineTo(p.x, p.y); else g.moveTo(p.x, p.y); }); g.stroke();
-  P.forEach(function (p) { g.beginPath(); g.arc(p.x, p.y, 5, 0, 7); g.fill(); });
-  if (P.length === 3) {
-    var a = Math.atan2(P[0].y - P[1].y, P[0].x - P[1].x), b = Math.atan2(P[2].y - P[1].y, P[2].x - P[1].x), d = Math.abs(a - b) * 180 / Math.PI; if (d > 180) d = 360 - d;
-    g.font = 'bold 22px sans-serif'; g.lineWidth = 4; g.strokeStyle = '#000'; var txt = Math.round(d) + '°'; g.strokeText(txt, P[1].x + 10, P[1].y - 10); g.fillText(txt, P[1].x + 10, P[1].y - 10);
-  }
-}
+function sizeOv() { var v = $('#vid'), o = $('#ov'); if (!v || !o) return; o.width = v.clientWidth; o.height = v.clientHeight; o.style.left = v.offsetLeft + 'px'; o.style.top = v.offsetTop + 'px'; drawOv(); }
 function saveVa() {
   var c = VS.cfg; if (!c.sid) { K.toast(T('needSw')); return; }
   if (!VS.ev.length) { K.toast(T('noEv')); return; }
   var r = compute(c, VS.ev), id = VS.id || K.uid();
-  var sum = { final: r.final, rt: r.rt, t15: r.t15, turn: r.turn, turnSum: r.turnSum, v: r.v, sr: r.sr, dps: r.dps, fin5: r.fin5, vDrop: r.vDrop, srDrop: r.srDrop };
-  K.mutate('saveTest', { rec: { id: id, swimmerId: c.sid, type: 'va', date: c.date || K.today(), data: { cfg: JSON.parse(JSON.stringify(c)), ev: VS.ev.map(function (e) { return { k: e.k, t: Math.round(e.t * 10000) / 10000, d: e.d }; }), fname: VS.fname, sum: sum } } });
+  var XX = computeX(c, VS.ev), iv0 = ivvOf(c, VS.trk, VS.cal);
+  var sum = { idc: XX.arm ? XX.arm.idc : null, ivv: iv0 ? iv0.ivv : null, bt: XX.st.bt, final: r.final, rt: r.rt, t15: r.t15, turn: r.turn, turnSum: r.turnSum, v: r.v, sr: r.sr, dps: r.dps, fin5: r.fin5, vDrop: r.vDrop, srDrop: r.srDrop };
+  K.mutate('saveTest', { rec: { id: id, swimmerId: c.sid, type: 'va', date: c.date || K.today(), data: { cfg: JSON.parse(JSON.stringify(c)), ev: VS.ev.map(function (e) { return { k: e.k, t: Math.round(e.t * 10000) / 10000, d: e.d }; }), fname: VS.fname, sum: sum, meas: VS.meas || [], cal: VS.cal || null, trk: VS.trk || [] } } });
   if (VS.snaps && VS.snaps.length) { try { localStorage.setItem('wav_snaps_' + id, JSON.stringify(VS.snaps)); } catch (e) {} }
+  if (VS.mimg) { var keep = {}; (VS.meas || []).forEach(function (m) { if (VS.mimg[m.id]) keep[m.id] = VS.mimg[m.id]; }); try { localStorage.setItem('wav_mimg_' + id, JSON.stringify(keep)); } catch (e) {} }
   VS.id = id; VS.dirty = false; K.toast(T('saved')); K.render();
 }
 function openRec(rec) {
   VS.id = rec.id; VS.cfg = Object.assign(defCfg(), rec.data.cfg || {}, { sid: rec.swimmerId, date: rec.date }); VS.ev = (rec.data.ev || []).map(function (e) { return { k: e.k, t: e.t, d: e.d }; });
   if (VS.fname !== rec.data.fname && VS.url) { try { URL.revokeObjectURL(VS.url); } catch (e) {} VS.url = null; }
-  VS.fname = rec.data.fname || ''; VS.snaps = snapsOf(rec.id).slice(); VS.dirty = false; VS.tab = 'new'; K.render();
+  VS.fname = rec.data.fname || ''; VS.snaps = snapsOf(rec.id).slice(); VS.meas = JSON.parse(JSON.stringify(rec.data.meas || [])); VS.cal = rec.data.cal || null; VS.trk = JSON.parse(JSON.stringify(rec.data.trk || [])); VS.mimg = mimgOf(rec.id); VS.dirty = false; VS.tab = 'new'; K.render();
 }
 
 /* ---------- historique ---------- */
@@ -474,8 +460,9 @@ function loadImgs(src) { return Promise.all(src.map(function (s) { return new Pr
 function drawReport(src, lg) {
   var c = src.cfg, evs = src.ev, r = compute(c, evs), ck = checkEv(c, evs, r, lg), sm = summary(c, r, lg), ph = phasesOf(c, evs, r);
   var prev = prevOf(src.sid, c, src.id, src.date), pr = prev ? compute(Object.assign(defCfg(), prev.data.cfg), prev.data.ev || []) : null;
-  return Promise.all([logoImg(), loadImgs(snapsOf(src.id).slice(0, 3))]).then(function (res) {
-    var logo = res[0], snaps = res[1].filter(Boolean);
+  var MS = (src.meas || []).filter(function (m) { return m.ty === 'ang3' || m.ty === 'angH' || m.ty === 'dist'; }), MI = MS.filter(function (m) { return src.mimg && src.mimg[m.id]; }).slice(0, 6);
+  return Promise.all([logoImg(), loadImgs(snapsOf(src.id).slice(0, 3)), loadImgs(MI.map(function (m) { return src.mimg[m.id]; }))]).then(function (res) {
+    var logo = res[0], snaps = res[1].filter(Boolean), mimgs = res[2];
     var W = 1240, M = 64, cv = document.createElement('canvas'); cv.width = W; cv.height = 4200;
     var g = cv.getContext('2d'), rtl = lg !== 'fr', FN = '"IBM Plex Sans Arabic","Inter","Segoe UI",Tahoma,sans-serif', NF = '"Inter","Segoe UI",Arial,sans-serif';
     var X = function (x) { return rtl ? W - x : x; };
@@ -539,6 +526,39 @@ function drawReport(src, lg) {
       cmp.forEach(function (cm, i) { if (cm[1] == null || cm[2] == null) return; var d = cm[2] - cm[1], better = cm[3] ? d > 0 : d < 0, col = Math.abs(d) < 0.005 ? '#64748b' : better ? '#047857' : '#b91c1c'; var cx = M + (i % 3) * 380, cy = y + Math.floor(i / 3) * 70; tx(rt(cm[0], lg) + ' :', cx, cy + 24, { s: 19, c: '#334155' }); tx((d > 0 ? '+' : d < 0 ? '−' : '') + Math.abs(d).toFixed(2) + (cm[3] ? ' m/s' : ' s'), rtl ? W - cx - 190 : cx + 190, cy + 24, { s: 22, w: 800, n: 1, raw: 1, a: rtl ? 'right' : 'left', c: col }); });
       y += 150;
     }
+    // ---- analyse avancée
+    var XX = computeX(c, evs), kk = src.cal && src.cal.pts ? src.cal.m / Math.hypot(src.cal.pts[1].x - src.cal.pts[0].x, src.cal.pts[1].y - src.cal.pts[0].y) : null;
+    var kv = function (items) { var cw2 = (W - 2 * M - 3 * 16) / 4; items.forEach(function (it, i) { var cx = M + (i % 4) * (cw2 + 16), cy = y + Math.floor(i / 4) * 100; rect(cx, cy, cw2, 86, '#f1f6fd', 12); tx(it[0], cx + 16, cy + 30, { s: 17, w: 700, c: '#0b2a6e' }); tx(it[1], rtl ? W - cx - 16 : cx + 16, cy + 70, { s: 28, w: 800, n: 1, raw: 1, a: rtl ? 'right' : 'left' }); }); y += Math.ceil(items.length / 4) * 100 + 14; };
+    var tbl = function (head, rows, fr) { var tw2 = W - 2 * M; rect(M, y, tw2, 40, '#0b2a6e', 8); var x0 = 0; head.forEach(function (hh, j) { var w = tw2 * fr[j]; tx(hh, rtl ? W - M - x0 - w / 2 : M + x0 + w / 2, y + 27, { s: 16, w: 700, c: '#fff', raw: 1, a: 'center' }); x0 += w; }); y += 40; rows.forEach(function (rw, i) { if (i % 2) rect(M, y, tw2, 38, '#f5f8fd', 0); var x1 = 0; rw.forEach(function (v, j) { var w = tw2 * fr[j]; tx(String(v), rtl ? W - M - x1 - w / 2 : M + x1 + w / 2, y + 26, { s: 17, w: j ? 500 : 700, n: j ? 1 : 0, raw: 1, a: 'center' }); x1 += w; }); y += 38; }); y += 24; };
+    var nn = function (x, d, u) { return f2n(x, d, u); };
+    if (XX.st.bt != null || XX.st.ft != null || XX.st.kicks || XX.turns.some(function (t) { return t.cont != null || t.kicks; })) {
+      y = title(ptl('stT', lg).replace('🚀 ', ''), y);
+      kv([[ptl('bt', lg), nn(XX.st.bt, 2, 's')], [ptl('ft', lg), nn(XX.st.ft, 2, 's')], [ptl('t5', lg), nn(XX.st.t5, 2, 's')], [rt('t15', lg), nn(XX.st.t15, 2, 's')], [ptl('uwk', lg), XX.st.kicks || '—'], [ptl('brkD', lg), nn(XX.st.brkD, 1, 'm')]]);
+      if (XX.turns.length) tbl([ptl('turnN', lg), ptl('appr', lg), ptl('cont', lg), ptl('glide', lg), ptl('uwk', lg), ptl('brkD', lg)], XX.turns.map(function (t) { return [t.k, nn(t.appr), nn(t.cont), nn(t.glide), t.kicks || '—', nn(t.brkD, 1)]; }), [0.1, 0.22, 0.17, 0.17, 0.14, 0.2]);
+    }
+    if (XX.arm) {
+      var aa = XX.arm; y = title(ptl('armT', lg).replace('💪 ', ''), y);
+      kv([[ptl('cycT', lg), nn(aa.T, 2, 's')], [ptl('idc', lg), nn(aa.idc, 1, '%')], [ptl('sym', lg), nn(aa.sym, 1, '%')], [ptl('kb', lg), aa.kb ? String(Math.round(aa.kb)) : '—']]);
+      if (aa.idc != null) { tx('IdC : ' + (aa.idc < -1 ? ptl('idcCU', lg) : aa.idc > 1 ? ptl('idcSP', lg) : ptl('idcOP', lg)), M + 10, y + 4, { s: 19, w: 600, c: '#334155' }); y += 30; }
+      var arow = function (sd, o) { return [ptl(sd, lg), nn(o.A, 0, '%'), nn(o.B, 0, '%'), nn(o.C, 0, '%'), nn(o.D, 0, '%'), nn(o.B != null && o.C != null ? o.B + o.C : null, 0, '%')]; };
+      tbl(['', ptl('phA', lg), ptl('phB', lg), ptl('phC', lg), ptl('phD', lg), ptl('prop', lg)], [arow('right', aa.R)].concat(aa.L.A != null ? [arow('left', aa.L)] : []), [0.12, 0.2, 0.16, 0.16, 0.16, 0.2]);
+    }
+    if (XX.br) { y = title(ptl('brT', lg), y); kv(XX.br.perLap.map(function (nb, i) { return [rt('lap', lg) + ' ' + (i + 1), String(nb)]; }).concat([[ptl('brC', lg), nn(XX.br.perCyc, 1)]])); }
+    var IV = ivvOf(c, src.trk, src.cal);
+    if (IV) {
+      y = title(ptl('ivvT', lg).replace('⌖ ', ''), y);
+      kv([[ptl('ivv', lg), nn(IV.ivv, 1, '%')], [ptl('vMean', lg), nn(IV.mean, 2, 'm/s')], [ptl('vMin', lg), nn(IV.min, 2, 'm/s')], [ptl('vMax', lg), nn(IV.max, 2, 'm/s')]]);
+      var gx2 = M + 50, gw2 = W - 2 * M - 70, gh2 = 160, lo2 = IV.min * 0.95, hi2 = IV.max * 1.05, t00 = IV.pts[0].t, t11 = IV.pts[IV.pts.length - 1].t;
+      g.strokeStyle = '#e2e8f0'; g.lineWidth = 1; for (var q2 = 0; q2 <= 2; q2++) { var yy2 = y + gh2 * q2 / 2; g.beginPath(); g.moveTo(gx2, yy2); g.lineTo(gx2 + gw2, yy2); g.stroke(); tx((hi2 - (hi2 - lo2) * q2 / 2).toFixed(2), gx2 - 8, yy2 + 5, { s: 13, n: 1, raw: 1, a: 'right', c: '#65a30d' }); }
+      g.save(); g.strokeStyle = '#65a30d'; g.lineWidth = 3; g.beginPath(); IV.pts.forEach(function (pp, i) { var px = gx2 + gw2 * (pp.t - t00) / ((t11 - t00) || 1), py = y + gh2 * (1 - (pp.v - lo2) / ((hi2 - lo2) || 1)); if (i) g.lineTo(px, py); else g.moveTo(px, py); }); g.stroke(); g.restore();
+      y += gh2 + 20; y += wrap(ptl('ivvNote', lg), M + 10, y + 16, W - 2 * M - 20, { s: 16, c: '#64748b', lh: 26 }) + 20;
+    }
+    if (MS.length) {
+      y = title(ptl('meas', lg).replace('📐 ', ''), y); var RR = refs();
+      tbl([ptl('mT', lg), ptl('mName', lg), ptl('mVal', lg), ptl('mRef', lg), ''], MS.map(function (m) { var v = mVal(m, kk), r0 = RR[m.name], stt = m.ty === 'dist' || !r0 || v == null ? '' : (v >= r0[0] && v <= r0[1] ? '✓' : '⚠'); return [(m.t / (+c.slow || 1)).toFixed(2), m.name || '', mTxt(m, kk), r0 && m.ty !== 'dist' ? r0[0] + '–' + r0[1] + '°' : '—', stt]; }), [0.12, 0.42, 0.16, 0.18, 0.12]);
+      var okI = mimgs.map(function (im, i) { return im ? [im, MI[i]] : null; }).filter(Boolean);
+      if (okI.length) { var sl = (W - 2 * M - 2 * 16) / 3, rowH = 0; okI.forEach(function (pr2, i) { var im = pr2[0], sc = sl / im.width, hh2 = im.height * sc, col = i % 3; if (col === 0 && i) { y += rowH + 44; rowH = 0; } rowH = Math.max(rowH, hh2); var xx = rtl ? W - M - (col + 1) * sl - col * 16 : M + col * (sl + 16); g.drawImage(im, xx, y, sl, hh2); g.strokeStyle = '#cbd5e1'; g.lineWidth = 2; g.strokeRect(xx, y, sl, hh2); tx((pr2[1].name || '') + ' · ' + mTxt(pr2[1], kk), rtl ? xx + sl : xx, y + hh2 + 26, { s: 16, w: 600, raw: 1, a: rtl ? 'right' : 'left', c: '#334155' }); }); y += rowH + 54; }
+    }
     // notes
     if (c.notes) { y = title(rt('notes', lg), y); y += wrap(c.notes, M + 10, y + 20, W - 2 * M - 20, { s: 21, lh: 32, auto: 1 }) + 24; }
     // images
@@ -587,19 +607,335 @@ function openReport(src) {
   $('#repimg').onclick = function () { if (cur) cur.toBlob(function (b) { sendBlob(b, fileName(src, 'png')); }, 'image/png'); };
   $('#reppdf').onclick = function () { if (cur) sendBlob(pdfFromCanvas(cur), fileName(src, 'pdf')); };
 }
-function curSrc() { return { id: VS.id, sid: VS.cfg.sid, date: VS.cfg.date || K.today(), cfg: VS.cfg, ev: VS.ev }; }
-function recSrc(rec) { return { id: rec.id, sid: rec.swimmerId, date: rec.date, cfg: Object.assign(defCfg(), rec.data.cfg || {}), ev: (rec.data.ev || []).map(function (e) { return { k: e.k, t: e.t, d: e.d }; }) }; }
+function curSrc() { return { id: VS.id, sid: VS.cfg.sid, date: VS.cfg.date || K.today(), cfg: VS.cfg, ev: VS.ev, meas: VS.meas || [], cal: VS.cal, trk: VS.trk || [], mimg: VS.mimg || {} }; }
+function recSrc(rec) { return { id: rec.id, sid: rec.swimmerId, date: rec.date, cfg: Object.assign(defCfg(), rec.data.cfg || {}), ev: (rec.data.ev || []).map(function (e) { return { k: e.k, t: e.t, d: e.d }; }), meas: rec.data.meas || [], cal: rec.data.cal || null, trk: rec.data.trk || [], mimg: mimgOf(rec.id) }; }
+
+
+/* ================= analyse avancée : modes d'événements, mesures, cycle, IVV ================= */
+var PD = {
+  m_race: ['🏁 السباق', '🏁 Course'], m_st: ['🚀 الانطلاق والدوران', '🚀 Départ & virages'], m_arm: ['💪 الذراعين', '💪 Bras'], m_bk: ['🫁 تنفس ورجلين', '🫁 Respiration & jambes'],
+  evHE: ['دخول الماء', 'Entrée dans l’eau'], evDK: ['ضربة دولفين', 'Ondulation'], evTO: ['يفارق الحائط', 'Quitte le mur'], evBR: ['تنفس', 'Respiration'], evK: ['ضربة رجل', 'Battement'],
+  evRE: ['يمين: دخول', 'D : entrée'], evRP: ['يمين: بداية الشد', 'D : début traction'], evRS: ['يمين: تحت الكتف', 'D : sous l’épaule'], evRX: ['يمين: خروج', 'D : sortie'],
+  evLE: ['يسار: دخول', 'G : entrée'], evLP: ['يسار: بداية الشد', 'G : début traction'], evLS: ['يسار: تحت الكتف', 'G : sous l’épaule'], evLX: ['يسار: خروج', 'G : sortie'],
+  h_race: ['اضغط كي يقطع الراس العلامة.', 'Cliquer quand la tête franchit le repère.'],
+  h_st: ['الانطلاق: الإشارة ← يفارق المكعب ← دخول الماء (اليدين) ← كل ضربة دولفين ← الطلوع. الدوران: الحائط (اللمس) ← يفارق الحائط ← ضربات الدولفين ← الطلوع.', 'Départ : signal → décollage → entrée (mains) → chaque ondulation → sortie. Virage : mur (contact) → quitte le mur → ondulations → sortie.'],
+  h_arm: ['فيديو من الجنب تحت الماء. لكل يد 4 لحظات: <b>الدخول</b> ← <b>بداية الشد</b> (اليد تبدا ترجع للور) ← <b>تحت الكتف</b> ← <b>الخروج</b>. علّم دورتين على الأقل.', 'Vue latérale sous l’eau. Pour chaque bras : <b>entrée</b> → <b>début traction</b> (la main recule) → <b>sous l’épaule</b> → <b>sortie</b>. Au moins deux cycles.'],
+  h_bk: ['اضغط «تنفس» كي يطلع الراس يتنفس، و«ضربة رجل» في كل ضربة (رجل وحدة).', '« Respiration » à chaque inspiration, « Battement » à chaque battement (une jambe).'],
+  tools: ['أدوات القياس والرسم', 'Outils de mesure et de dessin'], t_ang3: ['📐 زاوية', '📐 Angle'], t_angH: ['∠ مع الأفق', '∠ / horizontale'], t_dist: ['📏 مسافة', '📏 Distance'], t_cal: ['⚖ معايرة', '⚖ Étalonner'], t_line: ['／ خط', '／ Ligne'], t_arrow: ['➚ سهم', '➚ Flèche'], t_circle: ['◯ دائرة', '◯ Cercle'], t_text: ['T نص', 'T Texte'], t_trk: ['⌖ تتبع', '⌖ Suivi'], t_guide: ['📷 دليل التصوير', '📷 Guide de tournage'],
+  th_ang3: ['اضغط 3 نقاط: طرف ← المفصل ← الطرف الآخر', '3 points : extrémité → articulation → extrémité'], th_angH: ['اضغط نقطتين على الخط (الزاوية مع الأفق)', '2 points sur le segment (angle avec l’horizontale)'], th_dist: ['اضغط نقطتين (لازم المعايرة قبل)', '2 points (étalonnage nécessaire)'], th_cal: ['اضغط على زوج نقاط مسافتهم معروفة (مثلاً علامتين في الحبل)، ومن بعد اكتب المسافة بالمتر', '2 points de distance connue (ex. deux repères), puis la distance en m'], th_line: ['نقطتين: خط مرجعي (أفقي ولا عمودي يتعدّل وحدو)', '2 points : ligne de référence'], th_arrow: ['نقطتين: من ← إلى', '2 points : de → vers'], th_circle: ['المركز ← الحافة', 'centre → bord'], th_text: ['اضغط وين تحب الكتابة', 'Cliquer à l’emplacement du texte'], th_trk: ['اضغط على الحوض (ولا الراس) في كل صورة، والفيديو يتقدم وحدو', 'Cliquer sur la hanche (ou la tête) à chaque image ; la vidéo avance seule'],
+  calM: ['المسافة بالمتر بين النقطتين؟', 'Distance en mètres entre les deux points ?'], txtQ: ['النص؟', 'Texte ?'], needCal: ['دير المعايرة الأول (⚖)', 'Étalonnez d’abord (⚖)'], calOk: ['المعايرة تسجّلت', 'Étalonnage enregistré'],
+  meas: ['📐 القياسات', '📐 Mesures'], mName: ['الإسم', 'Nom'], mVal: ['القيمة', 'Valeur'], mRef: ['المرجع', 'Réf.'], mT: ['الوقت', 'Temps'], noMeas: ['ما كاين حتى قياس. اختار أداة فوق الفيديو.', 'Aucune mesure. Choisissez un outil au-dessus de la vidéo.'],
+  mOver: ['تتبع في الزمن', 'Évolution dans le temps'], mPrev: ['المرة اللي فاتت', 'Fois précédente'], refNote: ['المراجع تقريبية، تقدر تبدّلها (تتحفظ في هذا الجهاز).', 'Références indicatives, modifiables (enregistrées sur cet appareil).'],
+  stT: ['🚀 الانطلاق والدوران بالتفصيل', '🚀 Départ et virages en détail'], bt: ['زمن البلوك', 'Temps de bloc'], ft: ['زمن الطيران', 'Temps de vol'], t5: ['زمن 5 م', 'Temps 5 m'], uwk: ['ضربات تحت الماء', 'Ondulations'], brkD: ['مسافة الطلوع', 'Distance de coulée'],
+  appr: ['الاقتراب (5 م ← الحائط)', 'Approche (5 m → mur)'], cont: ['اللمس في الحائط', 'Contact au mur'], glide: ['الدفعة ← 5 م', 'Poussée → 5 m'], start: ['الانطلاق', 'Départ'], turnN: ['الدوران', 'Virage'],
+  armT: ['💪 دورة الذراعين', '💪 Cycle de bras'], phA: ['الدخول والمسك', 'Entrée & prise'], phB: ['الشد', 'Traction'], phC: ['الدفع', 'Poussée'], phD: ['الرجوع', 'Retour'], right: ['يمين', 'Droit'], left: ['يسار', 'Gauche'], prop: ['الدفع الفعّال', 'Propulsion'],
+  idc: ['مؤشر التنسيق IdC', 'Indice de coordination IdC'], idcCU: ['«يستناو بعضاهم» (catch-up)', 'rattrapé (catch-up)'], idcOP: ['«متقابلين» (opposition)', 'opposition'], idcSP: ['«متراكبين» (superposition)', 'superposition'],
+  sym: ['التناظر يمين/يسار', 'Symétrie D/G'], cycT: ['مدة الدورة', 'Durée du cycle'], nCyc: ['الدورات المعلّمة', 'Cycles repérés'],
+  brT: ['التنفس', 'Respiration'], brL: ['تنفس في كل طول', 'Respirations par longueur'], brC: ['دورات بين كل تنفس', 'Cycles par respiration'], kb: ['إيقاع الرجلين', 'Battements par cycle'],
+  ivvT: ['⌖ تذبذب السرعة داخل الدورة (IVV)', '⌖ Variation intra-cycle de vitesse (IVV)'], ivv: ['IVV', 'IVV'], vMean: ['السرعة المتوسطة', 'Vitesse moyenne'], vMin: ['أدنى', 'Min'], vMax: ['أقصى', 'Max'], nPts: ['نقاط', 'points'],
+  ivvNote: ['IVV = التذبذب في السرعة داخل الدورة. السباحين الكبار قرابة 7%، المبتدئين قرابة 10%. كل ما يكون أقل، السباحة أنعم وأقل تعب. يحتاج كاميرا ثابتة من الجنب ومعايرة.', 'IVV = fluctuation de la vitesse dans le cycle. ≈7 % chez les élites, ≈10 % chez les débutants. Plus bas = nage plus fluide. Caméra latérale fixe + étalonnage.'],
+  trkStep: ['التقدم بعد كل نقطة', 'Avance après chaque point'], trkClr: ['مسح التتبع', 'Effacer le suivi'], img: ['صورة', 'image'], imgs: ['صور', 'images'],
+  ok: ['✓', '✓'], out: ['⚠ خارج المرجع', '⚠ hors réf.'], del: ['حذف', 'Suppr.']
+};
+function pt(k, o) { var v = PD[k]; var s = v ? (L() === 'fr' ? v[1] : v[0]) : k; if (o) Object.keys(o).forEach(function (x) { s = s.split('{' + x + '}').join(o[x]); }); return s; }
+function ptl(k, lg) { var v = PD[k]; return v ? (lg === 'fr' ? v[1] : v[0]) : k; }
+['HE', 'DK', 'TO', 'BR', 'K', 'RE', 'RP', 'RS', 'RX', 'LE', 'LP', 'LS', 'LX'].forEach(function (k) { K.D['ev' + k] = PD['ev' + k]; });
+
+/* --- mesures : préréglages et références (modifiables, par appareil) --- */
+var MPRE = [
+  { n: ['المرفق في الشد (حرة)', 'Coude en traction (crawl)'], ty: 'ang3', lo: 90, hi: 120 },
+  { n: ['الركبة الأمامية فوق المكعب', 'Genou avant sur le plot'], ty: 'ang3', lo: 125, hi: 145 },
+  { n: ['الركبة في الدفع من الحائط', 'Genou à la poussée du mur'], ty: 'ang3', lo: 100, hi: 120 },
+  { n: ['زاوية دخول الجسم (الانطلاق)', 'Angle d’entrée du corps (départ)'], ty: 'angH', lo: 30, hi: 45 },
+  { n: ['ميلان الجسم في السباحة', 'Inclinaison du corps en nage'], ty: 'angH', lo: 0, hi: 8 },
+  { n: ['زاوية دخول اليد', 'Angle d’entrée de la main'], ty: 'angH' },
+  { n: ['مسافة الطيران', 'Distance de vol'], ty: 'dist' },
+  { n: ['عمق الغطس', 'Profondeur après l’entrée'], ty: 'dist' },
+  { n: ['عمق اليد في الشد', 'Profondeur de la main'], ty: 'dist' }
+];
+function refs() { var o = {}; MPRE.forEach(function (p) { if (p.lo != null) o[p.n[0]] = o[p.n[1]] = [p.lo, p.hi]; }); try { Object.assign(o, JSON.parse(localStorage.getItem('wav_refs') || '{}')); } catch (e) {} return o; }
+function setRef(name, lo, hi) { var o = {}; try { o = JSON.parse(localStorage.getItem('wav_refs') || '{}'); } catch (e) {} o[name] = [lo, hi]; try { localStorage.setItem('wav_refs', JSON.stringify(o)); } catch (e) {} }
+function mPx() { var c = VS.cal; if (!c || !c.pts || c.pts.length < 2 || !c.m) return null; var d = Math.hypot(c.pts[1].x - c.pts[0].x, c.pts[1].y - c.pts[0].y); return d ? c.m / d : null; }
+function angOf(m) {
+  var P = m.pts;
+  if (m.ty === 'ang3' && P.length === 3) { var a = Math.atan2(P[0].y - P[1].y, P[0].x - P[1].x), b = Math.atan2(P[2].y - P[1].y, P[2].x - P[1].x), d = Math.abs(a - b) * 180 / Math.PI; return d > 180 ? 360 - d : d; }
+  if (m.ty === 'angH' && P.length === 2) { var dx = Math.abs(P[1].x - P[0].x), dy = Math.abs(P[1].y - P[0].y); return Math.atan2(dy, dx) * 180 / Math.PI; }
+  return null;
+}
+function mVal(m, k) { if (m.ty === 'ang3' || m.ty === 'angH') return angOf(m); if (m.ty === 'dist' && m.pts.length === 2) { k = k || mPx(); return k ? Math.hypot(m.pts[1].x - m.pts[0].x, m.pts[1].y - m.pts[0].y) * k : null; } return null; }
+function mTxt(m, k) { var v = mVal(m, k); if (v == null) return m.ty === 'dist' ? '? m' : ''; return m.ty === 'dist' ? v.toFixed(2) + ' m' : Math.round(v) + '°'; }
+function mStatus(m, v) { var r = refs()[m.name]; if (!r || v == null || m.ty === 'dist') return null; return v >= r[0] && v <= r[1] ? 'ok' : 'out'; }
+
+/* --- outils sur la vidéo --- */
+var NEED = { ang3: 3, angH: 2, dist: 2, cal: 2, line: 2, arrow: 2, circle: 2, text: 1 };
+function toolBar() {
+  return '<div class="va-tools" id="tools">' + ['ang3', 'angH', 'dist', 'cal', 'line', 'arrow', 'circle', 'text', 'trk'].map(function (k) { return '<button class="btn sm' + (VS.tool === k ? ' pri' : '') + '" data-tool="' + k + '">' + pt('t_' + k) + '</button>'; }).join('') +
+    '<button class="btn sm" id="guideb">' + pt('t_guide') + '</button>' + (VS.tool ? '<span class="small va-th">' + pt('th_' + VS.tool) + '</span>' : '') +
+    (VS.tool === 'trk' ? '<label class="small" style="margin:0">' + pt('trkStep') + '</label><select id="trkst" style="width:auto;min-height:30px">' + [1, 2, 3, 5].map(function (n) { return '<option' + (VS.trkStep === n ? ' selected' : '') + '>' + n + '</option>'; }).join('') + '</select><button class="btn sm dan" id="trkclr">' + pt('trkClr') + '</button>' : '') + '</div>';
+}
+function setTool(k) { VS.tool = VS.tool === k ? null : k; VS.pts = []; var o = $('#ov'); if (o) o.style.pointerEvents = VS.tool ? 'auto' : 'none'; var tb = $('#tools'); if (tb) { tb.outerHTML = toolBar(); bindTools(); } if (VS.tool) { var v = $('#vid'); if (v) v.pause(); } drawOv(); }
+function bindTools() {
+  $$('[data-tool]').forEach(function (b) { b.onclick = function () { setTool(b.dataset.tool); }; });
+  if ($('#guideb')) $('#guideb').onclick = openGuide;
+  if ($('#trkst')) $('#trkst').onchange = function () { VS.trkStep = +this.value; };
+  if ($('#trkclr')) $('#trkclr').onclick = function () { if (confirm(T('confirmDel'))) { VS.trk = []; VS.dirty = true; refresh(); } };
+}
+function vidPt(e) { var v = $('#vid'), r = v.getBoundingClientRect(); return { x: Math.round((e.clientX - r.left) / r.width * v.videoWidth * 10) / 10, y: Math.round((e.clientY - r.top) / r.height * v.videoHeight * 10) / 10 }; }
+function onOvClick(e) {
+  if (!VS.tool) return; e.stopPropagation(); var v = $('#vid'), p = vidPt(e);
+  if (VS.tool === 'trk') {
+    if (!mPx()) { K.toast(pt('needCal')); return; }
+    var t = v.currentTime, f = 1 / (VS.fps || 30); VS.trk = (VS.trk || []).filter(function (q) { return Math.abs(q.t - t) > f / 2; }); VS.trk.push({ t: Math.round(t * 10000) / 10000, x: p.x, y: p.y }); VS.trk.sort(function (a, b) { return a.t - b.t; }); VS.dirty = true;
+    refreshRes(); step(VS.trkStep || 1); return;
+  }
+  VS.pts.push(p); drawOv();
+  if (VS.pts.length < NEED[VS.tool]) return;
+  var pts = VS.pts.slice(); VS.pts = [];
+  if (VS.tool === 'cal') { var m = parseFloat(String(prompt(pt('calM'), '5') || '').replace(',', '.')); if (m > 0) { VS.cal = { pts: pts, m: m }; VS.dirty = true; K.toast(pt('calOk')); } drawOv(); refreshRes(); return; }
+  var mm = { id: K.uid(), t: Math.round(v.currentTime * 10000) / 10000, ty: VS.tool, pts: pts, col: VS.tool === 'arrow' || VS.tool === 'circle' || VS.tool === 'text' || VS.tool === 'line' ? '#ff4d6d' : '#ffe14d' };
+  if (VS.tool === 'text') { var tx = prompt(pt('txtQ'), ''); if (!tx) { drawOv(); return; } mm.txt = tx; }
+  if (VS.tool === 'line') { var dx = Math.abs(pts[1].x - pts[0].x), dy = Math.abs(pts[1].y - pts[0].y); if (dy < dx * 0.08) pts[1].y = pts[0].y; else if (dx < dy * 0.08) pts[1].x = pts[0].x; }
+  if (VS.tool === 'ang3' || VS.tool === 'angH' || VS.tool === 'dist') { var same = MPRE.filter(function (q) { return q.ty === VS.tool; }); var last = (VS.meas || []).filter(function (q) { return q.ty === VS.tool; }).pop(); mm.name = last ? last.name : (same[0] ? tv(same[0].n) : pt('t_' + VS.tool)); }
+  VS.meas = (VS.meas || []).concat([mm]); VS.dirty = true; drawOv(); thumbFor(mm); refreshRes();
+}
+function thumbFor(m) {
+  setTimeout(function () { try { var v = $('#vid'), o = $('#ov'), tw = 480, cv = document.createElement('canvas'); cv.width = tw; cv.height = Math.round(v.videoHeight * tw / v.videoWidth); var g = cv.getContext('2d'); g.drawImage(v, 0, 0, cv.width, cv.height); g.drawImage(o, 0, 0, cv.width, cv.height); VS.mimg = VS.mimg || {}; VS.mimg[m.id] = cv.toDataURL('image/jpeg', 0.7); } catch (e) {} }, 30);
+}
+function drawShape(g, m, k, sc, ghost) {
+  var P = m.pts.map(function (p) { return { x: p.x * k, y: p.y * k }; }), col = ghost ? 'rgba(255,255,255,.7)' : (m.col || '#ffe14d');
+  g.save(); g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 3 * sc; g.lineCap = 'round';
+  var lbl = function (s, x, y) { g.font = 'bold ' + Math.round(20 * sc) + 'px sans-serif'; g.lineWidth = 4 * sc; g.strokeStyle = '#000'; g.strokeText(s, x, y); g.fillText(s, x, y); };
+  if (m.ty === 'circle' && P.length === 2) { g.beginPath(); g.arc(P[0].x, P[0].y, Math.hypot(P[1].x - P[0].x, P[1].y - P[0].y), 0, 7); g.stroke(); }
+  else if (m.ty === 'text' && P.length) lbl(m.txt || '', P[0].x, P[0].y);
+  else {
+    g.beginPath(); P.forEach(function (p, i) { if (i) g.lineTo(p.x, p.y); else g.moveTo(p.x, p.y); }); g.stroke();
+    if (m.ty === 'arrow' && P.length === 2) { var a = Math.atan2(P[1].y - P[0].y, P[1].x - P[0].x), h = 16 * sc; g.beginPath(); g.moveTo(P[1].x, P[1].y); g.lineTo(P[1].x - h * Math.cos(a - 0.45), P[1].y - h * Math.sin(a - 0.45)); g.lineTo(P[1].x - h * Math.cos(a + 0.45), P[1].y - h * Math.sin(a + 0.45)); g.closePath(); g.fill(); }
+    if (m.ty === 'angH' && P.length === 2) { g.setLineDash([6 * sc, 6 * sc]); g.beginPath(); g.moveTo(P[0].x - 60 * sc, P[0].y); g.lineTo(P[0].x + 80 * sc, P[0].y); g.stroke(); g.setLineDash([]); }
+    if (m.ty !== 'arrow' && m.ty !== 'line') P.forEach(function (p) { g.beginPath(); g.arc(p.x, p.y, 5 * sc, 0, 7); g.fill(); });
+    var s = m.ty === 'cal' ? (m.m + ' m') : mTxt(m); if (s && P.length >= NEED[m.ty]) { var q = m.ty === 'ang3' ? P[1] : { x: (P[0].x + P[1].x) / 2, y: (P[0].y + P[1].y) / 2 }; g.fillStyle = col; lbl(s + (m.name && !ghost ? '  ' + m.name : ''), q.x + 10 * sc, q.y - 10 * sc); }
+  }
+  g.restore();
+}
+function drawOv() {
+  var o = $('#ov'), v = $('#vid'); if (!o || !v || !v.videoWidth) return; var g = o.getContext('2d'); g.clearRect(0, 0, o.width, o.height);
+  var k = o.width / v.videoWidth, t = v.currentTime, tol = 0.5 / (VS.fps || 30) + 0.004;
+  if (VS.cal && (VS.tool === 'cal' || VS.tool === 'dist' || VS.tool === 'trk')) drawShape(g, { ty: 'cal', pts: VS.cal.pts, m: VS.cal.m, col: '#22d3ee' }, k, 1);
+  (VS.meas || []).forEach(function (m) { if (Math.abs(m.t - t) <= tol) drawShape(g, m, k, 1); });
+  if (VS.trk && VS.trk.length && (VS.tool === 'trk' || VS.trk.some(function (q) { return Math.abs(q.t - t) <= tol; }))) {
+    g.save(); g.strokeStyle = 'rgba(163,230,53,.9)'; g.fillStyle = '#a3e635'; g.lineWidth = 2; g.beginPath(); VS.trk.forEach(function (q, i) { if (i) g.lineTo(q.x * k, q.y * k); else g.moveTo(q.x * k, q.y * k); }); g.stroke();
+    VS.trk.forEach(function (q) { g.beginPath(); g.arc(q.x * k, q.y * k, Math.abs(q.t - t) <= tol ? 6 : 3, 0, 7); g.fill(); }); g.restore();
+  }
+  if (VS.pts && VS.pts.length) drawShape(g, { ty: VS.tool === 'cal' ? 'line' : VS.tool, pts: VS.pts, col: '#ffffff' }, k, 1, true);
+}
+
+/* --- calculs : départ/virages détaillés, cycle de bras, respiration, IVV --- */
+function computeX(c, evs) {
+  var f = +c.slow || 1, ev = evs.slice().sort(function (a, b) { return a.t - b.t; }), r = compute(c, evs), P = +c.pool;
+  var g = function (k, lap) { return ev.filter(function (e) { return e.k === k && (lap == null || e.lap === lap); }); };
+  var sig = g('S')[0], o = g('O')[0], he = g('HE')[0], walls = ev.filter(function (e) { return e.k === 'W' || e.k === 'F'; });
+  var m = function (lap, d) { var x = ev.find(function (e) { return e.k === 'M' && e.lap === lap && e.d === d; }); return x ? x.t : null; };
+  var st = { bt: sig && o ? (o.t - sig.t) / f : null, ft: o && he ? (he.t - o.t) / f : null, t5: sig && m(1, 5) != null ? (m(1, 5) - sig.t) / f : null, t15: r.t15, brkD: r.laps[0] ? r.laps[0].brkD : null };
+  var b1 = g('B', 1)[0]; st.kicks = g('DK', 1).filter(function (e) { return (!he || e.t > he.t) && (!b1 || e.t < b1.t); }).length || null;
+  var turns = [];
+  for (var i = 1; i < r.n; i++) {
+    var W = walls[i - 1]; if (!W) continue; var to = ev.find(function (e) { return e.k === 'TO' && e.t >= W.t && e.lap === i + 1; }), bb = g('B', i + 1)[0];
+    turns.push({ k: i, appr: m(i, P - 5) != null ? (W.t - m(i, P - 5)) / f : null, cont: to ? (to.t - W.t) / f : null, glide: to && m(i + 1, 5) != null ? (m(i + 1, 5) - to.t) / f : null, kicks: g('DK', i + 1).filter(function (e) { return e.t > (to ? to.t : W.t) && (!bb || e.t < bb.t); }).length || null, brkD: r.laps[i] ? r.laps[i].brkD : null });
+  }
+  // cycle de bras
+  var A = {}; ['RE', 'RP', 'RS', 'RX', 'LE', 'LP', 'LS', 'LX'].forEach(function (k) { A[k] = g(k).map(function (e) { return e.t; }); });
+  var nx = function (arr, t, t2) { for (var j = 0; j < arr.length; j++) if (arr[j] >= t && (t2 == null || arr[j] < t2)) return arr[j]; return null; };
+  var near = function (arr, t, w) { var best = null; arr.forEach(function (x) { if (Math.abs(x - t) <= w && (best == null || Math.abs(x - t) < Math.abs(best - t))) best = x; }); return best; };
+  var cyc = [];
+  for (var j = 0; j + 1 < A.RE.length; j++) {
+    var t0 = A.RE[j], t1 = A.RE[j + 1], T = (t1 - t0) / f; if (T <= 0 || T > 4) continue;
+    var rp = nx(A.RP, t0, t1), rs = nx(A.RS, t0, t1), rx = nx(A.RX, t0, t1); if (rp == null || rs == null || rx == null) continue;
+    var le = near(A.LE, (t0 + t1) / 2, T * f * 0.75), lp = le != null ? nx(A.LP, le, le + T * f) : null, ls = lp != null ? nx(A.LS, lp, lp + T * f) : null, lx = ls != null ? nx(A.LX, ls, ls + T * f) : null, le2 = le != null ? nx(A.LE, le + 0.01, null) : null;
+    var R = { A: (rp - t0) / f, B: (rs - rp) / f, C: (rx - rs) / f, D: (t1 - rx) / f }, Lh = le != null && lp != null && ls != null && lx != null && le2 != null ? { A: (lp - le) / f, B: (ls - lp) / f, C: (lx - ls) / f, D: (le2 - lx) / f } : null;
+    var rp2 = nx(A.RP, t1, null), lag1 = lp != null ? (lp - rx) / f : null, lag2 = lx != null && rp2 != null ? (rp2 - lx) / f : null, lags = [lag1, lag2].filter(function (x) { return x != null; });
+    cyc.push({ T: T, R: R, L: Lh, idc: lags.length ? -lags.reduce(function (a, b) { return a + b; }, 0) / lags.length / T * 100 : null, br: g('BR').filter(function (e) { return e.t >= t0 && e.t < t1; }).length, kk: g('K').filter(function (e) { return e.t >= t0 && e.t < t1; }).length });
+  }
+  var avg = function (a) { a = a.filter(function (x) { return x != null && isFinite(x); }); return a.length ? a.reduce(function (p, q) { return p + q; }, 0) / a.length : null; };
+  var arm = null;
+  if (cyc.length) {
+    var ph = function (side, k) { return avg(cyc.map(function (c2) { return c2[side] ? c2[side][k] / c2.T * 100 : null; })); };
+    arm = { n: cyc.length, T: avg(cyc.map(function (x) { return x.T; })), R: { A: ph('R', 'A'), B: ph('R', 'B'), C: ph('R', 'C'), D: ph('R', 'D') }, L: { A: ph('L', 'A'), B: ph('L', 'B'), C: ph('L', 'C'), D: ph('L', 'D') }, idc: avg(cyc.map(function (x) { return x.idc; })), kb: avg(cyc.map(function (x) { return x.kk || null; })) };
+    var pr = arm.R.B != null && arm.R.C != null ? arm.R.B + arm.R.C : null, pl = arm.L.B != null && arm.L.C != null ? arm.L.B + arm.L.C : null;
+    arm.propR = pr; arm.propL = pl; arm.sym = pr != null && pl != null ? (pr - pl) / ((pr + pl) / 2) * 100 : null;
+  }
+  // respiration
+  var brL = []; for (var l = 1; l <= r.n; l++) brL.push(g('BR', l).length);
+  var br = g('BR').length ? { perLap: brL, perCyc: cyc.length ? cyc.length / Math.max(1, cyc.reduce(function (a, b) { return a + b.br; }, 0)) : null } : null;
+  if (br && !cyc.length && r.sr) { var cl = r.laps.map(function (lp, i) { return lp.split && lp.sr && brL[i] ? lp.split * lp.sr / 60 / brL[i] : null; }); br.perCyc = avg(cl); }
+  return { r: r, st: st, turns: turns, arm: arm, br: br };
+}
+function ivvOf(c, trk, cal) {
+  if (!trk || trk.length < 6 || !cal || !cal.pts || !cal.m) return null;
+  var f = +c.slow || 1, dx = cal.pts[1].x - cal.pts[0].x, dy = cal.pts[1].y - cal.pts[0].y, L0 = Math.hypot(dx, dy), u = { x: dx / L0, y: dy / L0 }, k = cal.m / L0;
+  var s = trk.map(function (q) { return { t: q.t / f, s: (q.x * u.x + q.y * u.y) * k }; }), v = [];
+  for (var i = 1; i < s.length - 1; i++) { var dt = s[i + 1].t - s[i - 1].t; if (dt > 0) v.push({ t: s[i].t, v: Math.abs((s[i + 1].s - s[i - 1].s) / dt) }); }
+  var sm = v.map(function (x, i) { var a = v.slice(Math.max(0, i - 1), i + 2); return { t: x.t, v: a.reduce(function (p, q) { return p + q.v; }, 0) / a.length }; });
+  if (sm.length < 4) return null;
+  var mean = sm.reduce(function (p, q) { return p + q.v; }, 0) / sm.length, sd = Math.sqrt(sm.reduce(function (p, q) { return p + (q.v - mean) * (q.v - mean); }, 0) / (sm.length - 1));
+  return { mean: mean, ivv: sd / mean * 100, min: Math.min.apply(null, sm.map(function (x) { return x.v; })), max: Math.max.apply(null, sm.map(function (x) { return x.v; })), pts: sm, n: trk.length };
+}
+
+/* --- affichage dans l'écran d'analyse --- */
+function f2n(x, d, u) { if (x == null || !isFinite(x)) return '—'; var dd = d == null ? 2 : d; if (Math.abs(x) < 0.5 * Math.pow(10, -dd)) x = 0; return (+x).toFixed(dd) + (u ? ' ' + u : ''); }
+function idcLbl(x) { return x == null ? '' : x < -1 ? pt('idcCU') : x > 1 ? pt('idcSP') : pt('idcOP'); }
+function proHtml() {
+  var c = VS.cfg, X = computeX(c, VS.ev), h = '';
+  // départ / virages
+  if (X.st.bt != null || X.st.ft != null || X.st.kicks || X.turns.some(function (t) { return t.cont != null || t.kicks; })) {
+    h += '<div class="card"><h3>' + pt('stT') + '</h3><div class="va-kpis">' + kpi(pt('bt'), f2n(X.st.bt), 's') + kpi(pt('ft'), f2n(X.st.ft), 's') + kpi(pt('t5'), f2n(X.st.t5), 's') + kpi(T('t15'), f2n(X.st.t15), 's') + kpi(pt('uwk'), X.st.kicks || '—', '') + kpi(pt('brkD'), f2n(X.st.brkD, 1), 'm') + '</div>';
+    if (X.turns.length) h += '<div class="tbl-wrap"><table><tr><th>' + pt('turnN') + '</th><th>' + pt('appr') + '</th><th>' + pt('cont') + '</th><th>' + pt('glide') + '</th><th>' + pt('uwk') + '</th><th>' + pt('brkD') + '</th></tr>' + X.turns.map(function (t) { return '<tr><td><b>' + t.k + '</b></td><td class="num">' + f2n(t.appr) + '</td><td class="num">' + f2n(t.cont) + '</td><td class="num">' + f2n(t.glide) + '</td><td class="num">' + (t.kicks || '—') + '</td><td class="num">' + f2n(t.brkD, 1) + '</td></tr>'; }).join('') + '</table></div>';
+    h += '</div>';
+  }
+  // bras
+  if (X.arm) {
+    var a = X.arm, row = function (s, o) { return '<tr><td style="text-align:start"><b>' + pt(s) + '</b></td>' + ['A', 'B', 'C', 'D'].map(function (k) { return '<td class="num">' + f2n(o[k], 0, '%') + '</td>'; }).join('') + '<td class="num"><b>' + f2n(o.B != null && o.C != null ? o.B + o.C : null, 0, '%') + '</b></td></tr>'; };
+    h += '<div class="card"><h3>' + pt('armT') + '</h3><div class="va-kpis">' + kpi(pt('cycT'), f2n(a.T), 's') + kpi(pt('idc'), f2n(a.idc, 1, '%'), '') + kpi(pt('sym'), f2n(a.sym, 1, '%'), '') + kpi(pt('kb'), a.kb ? Math.round(a.kb) : '—', '') + kpi(pt('nCyc'), a.n, '') + '</div>' +
+      (a.idc != null ? '<p class="small">IdC <b class="num">' + f2n(a.idc, 1, '%') + '</b> = ' + idcLbl(a.idc) + '</p>' : '') +
+      '<div class="tbl-wrap"><table><tr><th></th><th>' + pt('phA') + '</th><th>' + pt('phB') + '</th><th>' + pt('phC') + '</th><th>' + pt('phD') + '</th><th>' + pt('prop') + '</th></tr>' + row('right', a.R) + (a.L.A != null ? row('left', a.L) : '') + '</table></div></div>';
+  }
+  if (X.br) h += '<div class="card"><h3>' + pt('brT') + '</h3><div class="va-kpis">' + X.br.perLap.map(function (n, i) { return kpi(T('lap') + ' ' + (i + 1), n, ''); }).join('') + kpi(pt('brC'), f2n(X.br.perCyc, 1), '') + '</div></div>';
+  // IVV
+  var iv = ivvOf(c, VS.trk, VS.cal);
+  if ((VS.trk && VS.trk.length) || VS.tool === 'trk') h += '<div class="card"><h3>' + pt('ivvT') + '</h3>' + (iv ? '<div class="va-kpis">' + kpi(pt('ivv'), f2n(iv.ivv, 1, '%'), '') + kpi(pt('vMean'), f2n(iv.mean), 'm/s') + kpi(pt('vMin'), f2n(iv.min), 'm/s') + kpi(pt('vMax'), f2n(iv.max), 'm/s') + kpi(pt('nPts'), iv.n, '') + '</div><div class="chart" style="height:180px"><canvas id="ivch"></canvas></div>' : '<p class="small muted">' + (VS.trk ? VS.trk.length : 0) + ' ' + pt('nPts') + ' · ' + (mPx() ? '' : pt('needCal')) + '</p>') + '<p class="small muted">' + pt('ivvNote') + '</p></div>';
+  // mesures
+  var ms = (VS.meas || []).filter(function (m) { return m.ty === 'ang3' || m.ty === 'angH' || m.ty === 'dist'; }), dr = (VS.meas || []).filter(function (m) { return !(m.ty === 'ang3' || m.ty === 'angH' || m.ty === 'dist'); }), R = refs();
+  var prev = VS.cfg.sid ? prevOf(VS.cfg.sid, VS.cfg, VS.id, VS.cfg.date) : null, pm = prev ? (prev.data.meas || []) : [], pk = prev && prev.data.cal ? (function () { var cc = prev.data.cal, d = Math.hypot(cc.pts[1].x - cc.pts[0].x, cc.pts[1].y - cc.pts[0].y); return d ? cc.m / d : null; })() : null;
+  h += '<div class="card"><h3>' + pt('meas') + (VS.cal ? ' <span class="chip">⚖ ' + VS.cal.m + ' m</span>' : '') + '</h3>';
+  if (!ms.length && !dr.length) h += '<p class="small muted">' + pt('noMeas') + '</p>';
+  else {
+    h += '<datalist id="mpre">' + MPRE.map(function (p) { return '<option value="' + esc(tv(p.n)) + '">'; }).join('') + '</datalist><div class="tbl-wrap"><table class="va-mt"><tr><th>' + pt('mT') + '</th><th>' + pt('mName') + '</th><th>' + pt('mVal') + '</th><th>' + pt('mRef') + '</th><th>' + pt('mPrev') + '</th><th></th></tr>' +
+      ms.map(function (m) { var v = mVal(m), st = mStatus(m, v), r = R[m.name] || ['', ''], pv = pm.filter(function (q) { return q.name === m.name; }).map(function (q) { return mVal(q, pk); }).filter(function (x) { return x != null; }); var pvv = pv.length ? pv.reduce(function (a, b) { return a + b; }, 0) / pv.length : null;
+        return '<tr><td class="num"><a href="#" data-mt="' + m.t + '">' + F(m.t / (+c.slow || 1), 2) + '</a></td><td><input data-mn="' + m.id + '" list="mpre" value="' + esc(m.name || '') + '"></td><td class="num"><b>' + mTxt(m) + '</b> ' + (st ? '<span class="chip ' + (st === 'ok' ? 'ok' : 'warn') + '">' + pt(st) + '</span>' : '') + '</td><td>' + (m.ty === 'dist' ? '—' : '<span class="va-ref"><input data-rlo="' + esc(m.name) + '" value="' + r[0] + '" inputmode="decimal">–<input data-rhi="' + esc(m.name) + '" value="' + r[1] + '" inputmode="decimal">°</span>') + '</td><td class="num">' + (pvv != null ? (m.ty === 'dist' ? pvv.toFixed(2) + ' m' : Math.round(pvv) + '°') + (v != null ? ' <small class="muted">(' + (v - pvv >= 0 ? '+' : '−') + (m.ty === 'dist' ? Math.abs(v - pvv).toFixed(2) : Math.round(Math.abs(v - pvv))) + ')</small>' : '') : '—') + '</td><td><button class="btn sm" data-md="' + m.id + '">✕</button></td></tr>'; }).join('') +
+      dr.map(function (m) { return '<tr><td class="num"><a href="#" data-mt="' + m.t + '">' + F(m.t / (+c.slow || 1), 2) + '</a></td><td colspan="4" class="small muted" style="text-align:start">' + pt('t_' + m.ty) + (m.txt ? ' · ' + esc(m.txt) : '') + '</td><td><button class="btn sm" data-md="' + m.id + '">✕</button></td></tr>'; }).join('') + '</table></div><p class="small muted">' + pt('refNote') + '</p>';
+    var groups = {}; ms.forEach(function (m) { if (m.name) (groups[m.name] = groups[m.name] || []).push(m); });
+    var gl = Object.keys(groups).filter(function (n) { return groups[n].length >= 2; });
+    if (gl.length) h += '<h3 style="margin-top:12px">' + pt('mOver') + '</h3>' + gl.map(function (n, i) { return '<div class="small"><b>' + esc(n) + '</b></div><div class="chart" style="height:150px"><canvas id="mch' + i + '"></canvas></div>'; }).join('');
+    VS._mg = gl.map(function (n) { return groups[n]; });
+  }
+  h += '</div>';
+  VS._iv = iv;
+  return h;
+}
+function bindPro() {
+  var c = VS.cfg;
+  $$('[data-mt]').forEach(function (a) { a.onclick = function (e) { e.preventDefault(); var v = $('#vid'); if (v) { v.pause(); seekV(v, +a.dataset.mt); } }; });
+  $$('[data-mn]').forEach(function (i) { i.onchange = function () { var m = (VS.meas || []).find(function (q) { return q.id === i.dataset.mn; }); if (m) { m.name = i.value.trim(); VS.dirty = true; refreshRes(); drawOv(); } }; });
+  $$('[data-rlo],[data-rhi]').forEach(function (i) { i.onchange = function () { var n = i.dataset.rlo || i.dataset.rhi, lo = parseFloat($('[data-rlo="' + CSS.escape(n) + '"]').value), hi = parseFloat($('[data-rhi="' + CSS.escape(n) + '"]').value); if (isFinite(lo) && isFinite(hi)) { setRef(n, lo, hi); refreshRes(); } }; });
+  $$('[data-md]').forEach(function (b) { b.onclick = function () { VS.meas = (VS.meas || []).filter(function (m) { return m.id !== b.dataset.md; }); if (VS.mimg) delete VS.mimg[b.dataset.md]; VS.dirty = true; refreshRes(); drawOv(); }; });
+  if (window.Chart) {
+    var o = K.chartBase();
+    if (VS._iv && document.getElementById('ivch')) { var o1 = K.chartBase(); o1.scales = { x: { type: 'linear', title: { display: true, text: 's' } }, y: { title: { display: true, text: 'm/s' } } }; o1.plugins.legend = { display: false }; K.mk('ivch', { type: 'line', data: { datasets: [{ data: VS._iv.pts.map(function (p) { return { x: +(p.t - VS._iv.pts[0].t).toFixed(3), y: +p.v.toFixed(3) }; }), borderColor: '#a3e635', backgroundColor: '#a3e635', tension: 0.35, pointRadius: 2 }] }, options: o1 }); }
+    (VS._mg || []).forEach(function (gr, i) { var o2 = K.chartBase(); o2.plugins.legend = { display: false }; o2.scales = { x: { type: 'linear', title: { display: true, text: 's' } } }; K.mk('mch' + i, { type: 'line', data: { datasets: [{ data: gr.slice().sort(function (a, b) { return a.t - b.t; }).map(function (m) { return { x: +(m.t / (+c.slow || 1)).toFixed(2), y: +(mVal(m) || 0).toFixed(2) }; }), borderColor: '#22d3ee', backgroundColor: '#22d3ee', tension: 0.3 }] }, options: o2 }); });
+  }
+}
+function refreshRes() { if ($('#vpro')) { $('#vpro').innerHTML = proHtml(); bindPro(); } }
+
+/* --- boutons d'événements par mode --- */
+var MODES = { race: null, st: ['S', 'O', 'HE', 'DK', 'B', 'M5', 'M15', 'W', 'TO'], arm: ['RE', 'RP', 'RS', 'RX', 'LE', 'LP', 'LS', 'LX'], bk: ['BR', 'K', 'C'] };
+function modeTabs() { return '<div class="seg va-modes">' + ['race', 'st', 'arm', 'bk'].map(function (k) { return '<button class="btn sm' + ((VS.mode || 'race') === k ? ' on' : '') + '" data-mode="' + k + '">' + pt('m_' + k) + '</button>'; }).join('') + '</div>'; }
+function renderBtns() {
+  var box = $('#evbtns'); if (!box) return;
+  var lap = curLap(), n = laps(VS.cfg), c = VS.cfg, b = [], mode = VS.mode || 'race';
+  if (mode === 'race') {
+    if (lap === 1) { b.push(['S', T('evS'), 'S']); if (c.start !== 'push') b.push(['O', T('evO'), 'O']); }
+    b.push(['B', T('evB'), 'B']);
+    markers(c.pool).forEach(function (d, i) { b.push(['M' + d, mU(d), String(i + 1)]); });
+    b.push([lap === n ? 'F' : 'W', lap === n ? T('evF') : T('evW'), 'W']);
+    b.push(['C', T('evC'), 'C']);
+  } else MODES[mode].forEach(function (k, i) { if (k === 'W') b.push([lap === n ? 'F' : 'W', lap === n ? T('evF') : T('evW'), 'W']); else if (k.charAt(0) === 'M') b.push([k, mU(+k.slice(1)), String(i + 1)]); else b.push([k, T('ev' + k), String(i + 1)]); });
+  VS.keymap = {}; b.forEach(function (x) { if (/^[1-9]$/.test(x[2])) VS.keymap[x[2]] = x[0]; });
+  box.innerHTML = b.map(function (x) { return '<button class="btn' + (x[0] === 'C' ? ' cyc' : x[0] === 'W' || x[0] === 'F' ? ' wall' : /^R/.test(x[0]) && x[0].length === 2 ? ' arm-r' : /^L/.test(x[0]) && x[0].length === 2 ? ' arm-l' : '') + '" data-ev="' + x[0] + '">' + x[1] + '<kbd>' + x[2] + '</kbd></button>'; }).join('');
+  if ($('#lapn')) $('#lapn').textContent = lap + ' / ' + n;
+  if ($('#evhelp')) $('#evhelp').innerHTML = mode === 'race' ? T('evHelp') : pt('h_' + mode);
+  $$('[data-ev]', box).forEach(function (bt) { bt.onclick = function () { addEv(bt.dataset.ev); }; });
+}
+function bindModes() { $$('[data-mode]').forEach(function (b) { b.onclick = function () { VS.mode = b.dataset.mode; $$('[data-mode]').forEach(function (x) { x.classList.toggle('on', x === b); }); renderBtns(); }; }); }
+
+/* --- guide de tournage --- */
+var GUIDE = [
+  ['📏 السباق والأزمنة (السرعة، الإيقاع، الدورانات)', '📏 Course et temps (vitesse, fréquence, virages)', ['من المدرجات، فوق، من الجنب. تتبّع السباح ولا خلّي المسبح كامل في الصورة.', 'العلامات (5 م، 15 م) والحائطين يبانو.', '1080p · 60 صورة/ث · أفقي.'], ['Depuis les gradins, en hauteur, de côté. Suivre le nageur ou cadrer tout le bassin.', 'Repères (5 m, 15 m) et murs visibles.', '1080p · 60 i/s · horizontal.']],
+  ['🚀 الانطلاق', '🚀 Départ', ['كاميرا فوق الماء: من الجنب، <b>عمودية على المكعب</b>، على بعد 5–10 م، في علو المكعب. تبان من المكعب حتى 7 م.', 'كاميرا تحت الماء (الغلاف): من الجنب، عمق 0.5–1 م، تقابل 3–8 م من الحائط: الدخول، العمق، ضربات الدولفين.', '120–240 صورة/ث إذا الهاتف يقدر.'], ['Caméra hors de l’eau : de côté, <b>perpendiculaire au plot</b>, à 5–10 m, hauteur du plot ; cadrer du plot à 7 m.', 'Caméra sous l’eau : de côté, 0,5–1 m de profondeur, face à la zone 3–8 m : entrée, profondeur, ondulations.', '120–240 i/s si possible.']],
+  ['🔄 الدوران', '🔄 Virage', ['من الجنب، الحائط في وسط الصورة، و 5 م من كل جيهة تبان.', 'تحت الماء: الكاميرا قريبة من الحائط من الجنب، باش تشوف اللمس، الدفعة والطلوع.', '60–120 صورة/ث.'], ['De côté, mur au centre, 5 m visibles de chaque côté.', 'Sous l’eau : près du mur, de côté : contact, poussée, coulée.', '60–120 i/s.']],
+  ['💪 دورة الذراعين والتنسيق (IdC)', '💪 Cycle de bras et coordination (IdC)', ['<b>تحت الماء، من الجنب</b>، عمودية على اتجاه السباحة، في وسط المسبح (10–15 م).', 'عمق 0.5–1 م، على بعد 3–5 م من الحارة. السباح يتعدّى قدام الكاميرا 2–3 دورات.', 'زيد كاميرا <b>من القدام</b> تحت الماء باش تشوف مسار اليد والتناظر.', '60 صورة/ث على الأقل.'], ['<b>Sous l’eau, de côté</b>, perpendiculaire à la nage, milieu du bassin (10–15 m).', '0,5–1 m de profondeur, à 3–5 m du couloir ; 2–3 cycles devant la caméra.', 'Ajouter une vue <b>de face</b> sous l’eau pour le trajet de la main et la symétrie.', '60 i/s minimum.']],
+  ['⌖ IVV (تذبذب السرعة)', '⌖ IVV (variation de vitesse)', ['<b>كاميرا ثابتة</b> (حامل)، من الجنب، ما تتحركش ما تتبعش السباح.', 'حط في الصورة <b>مسافة معروفة</b> للمعايرة: علامتين في الحبل ولا عصا طولها 1–2 م.', 'تتبع الحوض (ولا الراس) صورة بصورة على 2–3 دورات. 60–120 صورة/ث.'], ['<b>Caméra fixe</b> (trépied), de côté, sans suivre le nageur.', 'Une <b>distance connue</b> dans l’image pour l’étalonnage : deux repères ou une perche de 1–2 m.', 'Suivre la hanche (ou la tête) image par image sur 2–3 cycles. 60–120 i/s.']],
+  ['📐 الزوايا', '📐 Angles', ['الكاميرا <b>عمودية</b> على المستوى اللي يتحرك فيه المفصل (من الجنب للمرفق والركبة). إذا مايلة، الزاوية تتغلط.', 'GoPro: استعمل وضع <b>Linear</b> باش ما يتعوجش الإطار.', 'وقّف على الصورة اللي المفصل فيها واضح، وكبّر بالزوم قبل ما تقيس.'], ['Caméra <b>perpendiculaire</b> au plan du mouvement (de côté pour coude et genou), sinon l’angle est faussé.', 'GoPro : mode <b>Linéaire</b> pour éviter la déformation.', 'Se placer sur l’image où l’articulation est nette et zoomer avant de mesurer.']]
+];
+function openGuide() {
+  var fr = L() === 'fr', box = document.createElement('div'); box.id = 'repbox';
+  box.innerHTML = '<div class="rep-in card"><div class="row" style="margin-bottom:10px"><b class="sp">' + pt('t_guide') + '</b><button class="btn sm" id="gx">✕</button></div>' + GUIDE.map(function (g) { return '<div class="kbox" style="margin-bottom:10px"><b>' + (fr ? g[1] : g[0]) + '</b><ul style="margin:6px 0 0;padding-inline-start:20px;line-height:1.8">' + (fr ? g[3] : g[2]).map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul></div>'; }).join('') + '</div>';
+  document.body.appendChild(box); $('#gx').onclick = function () { box.remove(); }; box.onclick = function (e) { if (e.target === box) box.remove(); };
+}
+
+/* --- rapport : sections supplémentaires --- */
+function mimgOf(id) { if (VS.id === id && VS.mimg && Object.keys(VS.mimg).length) return VS.mimg; try { return JSON.parse(localStorage.getItem('wav_mimg_' + id) || '{}'); } catch (e) { return {}; } }
+
+/* ================= zoom (molette, glisser, pincer) ================= */
+// z = {s, x, y} partagé par toutes les vues d'un même groupe
+function zoomable(stages, wraps, z, onTap) {
+  var ptr = {}, pan = null, pin = null;
+  var size = function () { return { W: wraps[0].offsetWidth, H: wraps[0].offsetHeight }; };
+  var apply = function () {
+    var d = size(); z.s = Math.max(1, Math.min(6, z.s)); z.x = Math.min(0, Math.max(d.W - d.W * z.s, z.x)); z.y = Math.min(0, Math.max(d.H - d.H * z.s, z.y));
+    wraps.forEach(function (w) { w.style.transform = 'translate(' + z.x + 'px,' + z.y + 'px) scale(' + z.s + ')'; });
+    stages.forEach(function (st) {
+      st.classList.toggle('zoomed', z.s > 1.001); st.style.touchAction = z.s > 1.001 ? 'none' : 'pan-y';
+      var m = st.querySelector('.va-mini i'); if (m) { m.style.width = (100 / z.s) + '%'; m.style.height = (100 / z.s) + '%'; m.style.left = (-z.x / z.s / d.W * 100) + '%'; m.style.top = (-z.y / z.s / d.H * 100) + '%'; }
+      var lb = st.querySelector('.va-zl'); if (lb) lb.textContent = '×' + z.s.toFixed(1);
+    });
+  };
+  var at = function (st, cx, cy) { var r = st.getBoundingClientRect(), r0 = wraps[0].parentNode.getBoundingClientRect(); return { x: cx - r0.left, y: cy - r0.top }; };
+  var zoomAt = function (p, f) { var ns = Math.max(1, Math.min(6, z.s * f)); z.x = p.x - (p.x - z.x) * ns / z.s; z.y = p.y - (p.y - z.y) * ns / z.s; z.s = ns; apply(); };
+  stages.forEach(function (st) {
+    st.addEventListener('wheel', function (e) { e.preventDefault(); zoomAt(at(st, e.clientX, e.clientY), e.deltaY < 0 ? 1.18 : 1 / 1.18); }, { passive: false });
+    st.addEventListener('pointerdown', function (e) {
+      if (e.target.closest('button,select,input,.va-mini') || (VS.tool && e.target.id === 'ov')) return;
+      ptr[e.pointerId] = { x: e.clientX, y: e.clientY }; try { st.setPointerCapture(e.pointerId); } catch (er) {}
+      var ids = Object.keys(ptr);
+      if (ids.length === 1) pan = { x: e.clientX, y: e.clientY, zx: z.x, zy: z.y, moved: false, t: Date.now() };
+      if (ids.length === 2) { var a = ptr[ids[0]], b = ptr[ids[1]]; pin = { d: Math.hypot(a.x - b.x, a.y - b.y), s: z.s, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2, zx: z.x, zy: z.y }; if (pan) pan.moved = true; }
+    });
+    st.addEventListener('pointermove', function (e) {
+      if (!ptr[e.pointerId]) return; ptr[e.pointerId] = { x: e.clientX, y: e.clientY }; var ids = Object.keys(ptr);
+      if (ids.length >= 2 && pin) {
+        var a = ptr[ids[0]], b = ptr[ids[1]], d = Math.hypot(a.x - b.x, a.y - b.y), mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, p = at(st, pin.mx, pin.my), ns = Math.max(1, Math.min(6, pin.s * d / (pin.d || 1)));
+        z.x = p.x - (p.x - pin.zx) * ns / pin.s + (mx - pin.mx); z.y = p.y - (p.y - pin.zy) * ns / pin.s + (my - pin.my); z.s = ns; apply(); e.preventDefault();
+      } else if (pan) {
+        var dx = e.clientX - pan.x, dy = e.clientY - pan.y; if (Math.abs(dx) + Math.abs(dy) > 5) pan.moved = true;
+        if (z.s > 1.001 && pan.moved) { z.x = pan.zx + dx; z.y = pan.zy + dy; apply(); e.preventDefault(); }
+      }
+    });
+    var end = function (e) {
+      if (!ptr[e.pointerId]) return; delete ptr[e.pointerId];
+      if (!Object.keys(ptr).length) { if (pan && !pan.moved && e.type === 'pointerup' && Date.now() - pan.t < 400 && onTap) onTap(); pan = null; pin = null; }
+      else if (Object.keys(ptr).length === 1) { pin = null; var k = Object.keys(ptr)[0]; pan = { x: ptr[k].x, y: ptr[k].y, zx: z.x, zy: z.y, moved: true, t: 0 }; }
+    };
+    st.addEventListener('pointerup', end); st.addEventListener('pointercancel', end);
+    st.addEventListener('dblclick', function () { z.s = 1; z.x = 0; z.y = 0; apply(); });
+    var mini = st.querySelector('.va-mini');
+    if (mini) mini.addEventListener('pointerdown', function (e) { e.stopPropagation(); var r = mini.getBoundingClientRect(), d = size(), fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height; z.x = -(fx * d.W * z.s - d.W / 2); z.y = -(fy * d.H * z.s - d.H / 2); apply(); });
+  });
+  window.addEventListener('resize', apply);
+  apply();
+  return { apply: apply, zoomIn: function () { var d = size(); zoomAt({ x: d.W / 2, y: d.H / 2 }, 1.4); }, zoomOut: function () { var d = size(); zoomAt({ x: d.W / 2, y: d.H / 2 }, 1 / 1.4); }, reset: function () { z.s = 1; z.x = 0; z.y = 0; apply(); } };
+}
+function zoomUi() { return '<div class="va-zui"><button class="btn sm" data-z="out">－</button><span class="va-zl num">×1.0</span><button class="btn sm" data-z="in">＋</button><button class="btn sm" data-z="reset">⊡</button></div><div class="va-mini"><i></i></div>'; }
+function bindZoomUi(st, Z) { $$('[data-z]', st).forEach(function (b) { b.onclick = function (e) { e.stopPropagation(); Z[b.dataset.z === 'in' ? 'zoomIn' : b.dataset.z === 'out' ? 'zoomOut' : 'reset'](); }; }); }
 
 /* ================= deux longueurs d'une même vidéo ================= */
 function lapStarts(c, evs) { var ev = evs.slice().sort(function (a, b) { return a.t - b.t; }), sig = ev.find(function (e) { return e.k === 'S'; }), w = ev.filter(function (e) { return e.k === 'W' || e.k === 'F'; }), o = [sig ? sig.t : (ev[0] ? ev[0].t : 0)]; for (var i = 1; i < laps(c); i++) o.push(w[i - 1] ? w[i - 1].t : null); return o; }
 function lapCmpHtml() {
   var n = laps(VS.cfg), lg = L(); if (!VS.url || n < 2) return '';
   var opt = function (sel) { var s = ''; for (var i = 1; i <= n; i++) s += '<option value="' + i + '"' + (i === sel ? ' selected' : '') + '>' + rt('lap', lg) + ' ' + i + '</option>'; return s; };
-  return '<div class="card"><h3>' + rt('lapCmp', lg) + '</h3><p class="small muted">' + rt('lapCmpH', lg) + '</p><div class="va-dual"><div><label class="small">' + rt('paneA', lg) + '</label><select id="lcA">' + opt(1) + '</select><video id="lv0" src="' + VS.url + '" playsinline preload="auto" muted></video></div><div><label class="small">' + rt('paneB', lg) + '</label><select id="lcB">' + opt(n) + '</select><video id="lv1" src="' + VS.url + '" playsinline preload="auto" muted></video></div></div>' +
+  return '<div class="card"><h3>' + rt('lapCmp', lg) + '</h3><p class="small muted">' + rt('lapCmpH', lg) + '</p><div class="va-dual"><div><label class="small">' + rt('paneA', lg) + '</label><select id="lcA">' + opt(1) + '</select><div class="va-stage va-dst"><div class="va-zm"><video id="lv0" src="' + VS.url + '" playsinline preload="auto" muted></video></div>' + zoomUi() + '</div></div><div><label class="small">' + rt('paneB', lg) + '</label><select id="lcB">' + opt(n) + '</select><div class="va-stage va-dst"><div class="va-zm"><video id="lv1" src="' + VS.url + '" playsinline preload="auto" muted></video></div>' + zoomUi() + '</div></div></div>' +
     '<div class="row" style="margin-top:8px;gap:6px;direction:ltr"><button class="btn sm" id="lsync">' + rt('syncL', lg) + '</button><button class="btn sm" data-ls="-1">◀</button><button class="btn pri sm" id="lplay">▶</button><button class="btn sm" data-ls="1">▶</button><select id="lrate" style="width:auto;min-height:34px">' + [0.1, 0.25, 0.5, 1].map(function (r) { return '<option value="' + r + '"' + (r === 0.25 ? ' selected' : '') + '>×' + r + '</option>'; }).join('') + '</select></div></div>';
 }
 function bindLapCmp() {
   var a = $('#lv0'), b = $('#lv1'); if (!a || !b) return;
+  var dst = $$('.va-dst'), Z2 = zoomable(dst, dst.map(function (d) { return d.querySelector('.va-zm'); }), VS.z2 = VS.z2 || { s: 1, x: 0, y: 0 }, function () { $('#lplay').click(); }); dst.forEach(function (d) { bindZoomUi(d, Z2); }); a.addEventListener('loadedmetadata', function () { Z2.apply(); });
   var vids = [a, b];
   var sync = function () { var st = lapStarts(VS.cfg, VS.ev), ia = +$('#lcA').value - 1, ib = +$('#lcB').value - 1; vids.forEach(function (v) { v.pause(); }); if (st[ia] != null) seekV(a, st[ia]); if (st[ib] != null) seekV(b, st[ib]); $('#lplay').textContent = '▶'; };
   vids.forEach(function (v) { v.playbackRate = 0.25; v.addEventListener('loadedmetadata', sync, { once: true }); });
