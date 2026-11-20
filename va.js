@@ -1,4 +1,4 @@
-/* Al-Wathba Analyse Vidéo — analyse de course (technique & vitesse) */
+/* MR WATHBA ANALYSE VIDÉO · BY OKBA — analyse de course (technique & vitesse) */
 (function () {
 'use strict';
 var K = window.VO2CORE, C = K.C, $ = K.$, $$ = K.$$, esc = K.esc, T = K.T, R = K.R, F = K.F;
@@ -352,7 +352,7 @@ var RD = {
   laps: ['تفاصيل الأطوال', 'Détail par longueur'], lap: ['الطول', 'Long.'], split: ['الجزئي', 'Partiel'], cum: ['التراكمي', 'Cumul'], brk: ['الطلوع', 'Coulée'], si: ['مؤشر الضربة', 'Indice'], turnC: ['الدوران', 'Virage'],
   chart: ['السرعة والإيقاع في كل طول', 'Vitesse et fréquence par longueur'], notes: ['ملاحظات تقنية', 'Notes techniques'], imgs: ['صور', 'Images'],
   prev: ['مقارنة مع التحليل اللي فات', 'Comparaison avec l’analyse précédente'], gain: ['ربح', 'gagné'], loss: ['ضيّع', 'perdu'], same: ['نفس الشي', 'identique'],
-  warn: ['⚠ علامات مشكوك فيها: الأرقام المعنية ماهيش أكيدة', '⚠ Repères douteux : chiffres concernés non fiables'], gen: ['تقرير من «الوثبة تحليل فيديو»', 'Rapport généré par « Al-Wathba Analyse Vidéo »'],
+  warn: ['⚠ علامات مشكوك فيها: الأرقام المعنية ماهيش أكيدة', '⚠ Repères douteux : chiffres concernés non fiables'], gen: ['تقرير من «MR WATHBA ANALYSE VIDÉO · BY OKBA»', 'Rapport généré par « MR WATHBA ANALYSE VIDÉO · BY OKBA »'],
   c_rt: ['ردة الفعل {v} ث ماهيش معقولة (العادي 0.5–1.0): شوف «الإشارة» و«الرجلين يفارقو»', 'Réaction {v} s improbable (0,5–1,0) : vérifier « Signal » et « Décollage »'],
   c_ord: ['الطول {l}: علامة {d} م جات قبل علامة أقرب منها', 'Longueur {l} : le repère {d} m arrive avant un repère plus proche'],
   c_seg: ['الطول {l}: بين {a} و {b} م السرعة {v} م/ث ما تصراش', 'Longueur {l} : entre {a} et {b} m, vitesse {v} m/s impossible'],

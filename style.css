@@ -1,4 +1,4 @@
-/* Al-Wathba Analyse Vidéo — interface « studio » */
+/* MR WATHBA ANALYSE VIDÉO · BY OKBA — interface « studio » */
 :root{
   --bg:#0a0d14;--bg2:#0f141f;--panel:#121926;--panel2:#18212f;--line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.14);
   --ink:#eef3fb;--mute:#8b98ae;--dim:#5d6a80;
@@ -200,3 +200,14 @@ html[dir="rtl"] .va-k:before{inset:0 0 0 auto}
 @media(max-width:700px){.va-vid.va-pin .va-stage video{max-height:30vh}.va-vid.va-pin{padding:8px}.va-vid.va-pin .va-ctl{margin-top:6px}}
 @media(max-height:700px){.va-vid.va-pin .va-stage video{max-height:36vh}}
 .va-toolc{padding:12px}
+
+/* v3 : MR WATHBA · BY OKBA + 📱 appareils */
+.hd .t b{direction:ltr;unicode-bidi:isolate}
+.hd .t b .hd-by{font-size:10.5px;font-weight:700;letter-spacing:.12em;opacity:.85}
+.auth-card .brand{font-size:21px;letter-spacing:.02em;margin-bottom:6px}
+.auth-card .by{display:inline-block;margin:0 0 10px;padding:2px 14px;border:1px solid #c9a24a99;border-radius:20px;color:#e9cf87;font:700 11.5px Inter,sans-serif;letter-spacing:.3em;direction:ltr}
+.auth-msg{margin:4px 0 14px;padding:10px 12px;border-radius:14px;border:1px solid var(--line2);background:color-mix(in srgb,var(--acc) 10%,transparent);font-size:14px;line-height:1.6;text-align:start}
+.auth-msg.gold{border-color:#c9a24a88;background:#c9a24a1f}
+.auth-code{font:900 44px/1.1 "JetBrains Mono",monospace;letter-spacing:10px;color:#e9cf87;margin:8px 0;direction:ltr}
+.auth-dev{margin-top:12px;color:var(--mute);font:600 11.5px Inter,sans-serif}
+.chip.warn{background:color-mix(in srgb,#f5b942 18%,transparent);color:#f5b942}
