@@ -211,3 +211,8 @@ html[dir="rtl"] .va-k:before{inset:0 0 0 auto}
 .auth-code{font:900 44px/1.1 "JetBrains Mono",monospace;letter-spacing:10px;color:#e9cf87;margin:8px 0;direction:ltr}
 .auth-dev{margin-top:12px;color:var(--mute);font:600 11.5px Inter,sans-serif}
 .chip.warn{background:color-mix(in srgb,#f5b942 18%,transparent);color:#f5b942}
+/* v6 : 🔧 الأخطاء والتصحيح + 🔴 Live */
+.va-fxi{border:1px solid color-mix(in srgb,var(--bad) 35%,transparent);border-inline-start:4px solid var(--bad);border-radius:12px;padding:10px 12px;margin-top:10px;background:color-mix(in srgb,var(--bad) 6%,transparent)}
+.va-fxi textarea{width:100%}
+.va-lv canvas{pointer-events:none}
+.va-lv{max-width:calc(62vh * 16 / 9);margin-inline:auto}

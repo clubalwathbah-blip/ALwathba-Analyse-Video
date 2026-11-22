@@ -29,7 +29,7 @@ Object.assign(K.D, {
 });
 
 var STROKES = [['NL', ['حرة', 'Nage libre']], ['DOS', ['ظهر', 'Dos']], ['BRA', ['صدر', 'Brasse']], ['PAP', ['فراشة', 'Papillon']], ['4N', ['متنوعة', '4 nages']]];
-var VS = { tab: 'new', url: null, fname: '', cfg: null, ev: [], dirty: false, id: null, sel: [], fps: 30, fpsAuto: true, angle: false, pts: [], cmp: null, z: null, z2: null, tool: null, mode: 'race', meas: [], cal: null, trk: [], mimg: {}, trkStep: 1 };
+var VS = { tab: 'new', url: null, fname: '', cfg: null, ev: [], dirty: false, id: null, sel: [], fps: 30, fpsAuto: true, angle: false, pts: [], cmp: null, z: null, z2: null, tool: null, mode: 'race', meas: [], cal: null, trk: [], trk2: [], mimg: {}, trkStep: 1, file: null };
 function defCfg() { return { sid: '', date: K.today(), ctx: 'train', label: '', pool: 25, dist: 50, stroke: 'NL', start: 'dive', slow: 1 }; }
 function markers(pool) { return +pool === 50 ? [5, 10, 15, 25, 35, 40, 45] : [5, 10, 15, 20]; }
 function laps(c) { return Math.max(1, Math.round(c.dist / c.pool)); }
@@ -95,11 +95,12 @@ function vVideo(app) {
   document.body.classList.add('wide');
   if (!VS.cfg) VS.cfg = defCfg();
   var h = '<div class="row"><h1 class="sp" style="margin:0 8px">🎥 ' + T('appName') + '</h1><div class="seg">' +
-    [['new', VS.id ? '✎ ' + T('vaNew') : T('vaNew')], ['hist', T('vaHist') + ' (' + vaRecs().length + ')'], ['cmp', T('vaCmp')], ['sw', T('vaSwTab')]].map(function (x) { return '<button class="btn sm' + (VS.tab === x[0] ? ' on' : '') + '" data-tab="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div></div>';
-  if (VS.tab === 'hist') h += histHtml(); else if (VS.tab === 'cmp') h += cmpHtml(); else if (VS.tab === 'sw') h += swHtml(); else h += anaHtml();
+    [['new', VS.id ? '✎ ' + T('vaNew') : T('vaNew')]].concat(window.WLIVE ? [['live', WLIVE.label()]] : []).concat([['hist', T('vaHist') + ' (' + vaRecs().length + ')'], ['cmp', T('vaCmp')], ['sw', T('vaSwTab')]]).map(function (x) { return '<button class="btn sm' + (VS.tab === x[0] ? ' on' : '') + '" data-tab="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div></div>';
+  if (VS.tab === 'live' && !window.WLIVE) VS.tab = 'new';
+  if (VS.tab === 'hist') h += histHtml(); else if (VS.tab === 'cmp') h += cmpHtml(); else if (VS.tab === 'sw') h += swHtml(); else if (VS.tab === 'live') h += WLIVE.html(); else h += anaHtml();
   app.innerHTML = h;
-  $$('[data-tab]').forEach(function (b) { b.onclick = function () { VS.tab = b.dataset.tab; K.render(); }; });
-  if (VS.tab === 'hist') bindHist(); else if (VS.tab === 'cmp') bindCmp(); else if (VS.tab === 'sw') bindSw(); else bindAna();
+  $$('[data-tab]').forEach(function (b) { b.onclick = function () { if (VS.tab === 'live' && b.dataset.tab !== 'live' && window.WLIVE) WLIVE.stop(); VS.tab = b.dataset.tab; K.render(); }; });
+  if (VS.tab === 'hist') bindHist(); else if (VS.tab === 'cmp') bindCmp(); else if (VS.tab === 'sw') bindSw(); else if (VS.tab === 'live') WLIVE.bind(); else bindAna();
 }
 
 /* ---------- analyse ---------- */
@@ -116,7 +117,7 @@ function anaHtml() {
     '<span class="sp"></span><span class="mono ltr" id="tdisp" style="font-weight:700">0.00</span><span class="chip ltr" id="fpsd"></span><button class="btn sm' + (pin ? ' pri' : '') + '" id="vpin" title="' + esc(pt('pinT')) + '">📌</button><button class="btn sm" id="snap">' + T('snap') + '</button><label class="btn sm" style="margin:0">📂<input type="file" id="vfile2" accept="video/*" hidden></label></div>' +
     '</div></div>';
   var toolsC = VS.url ? '<div class="card va-toolc"><div class="va-ctl" style="margin-top:0">' + toolBar() + (window.WAI ? WAI.html() : '') + '<div class="small muted" dir="auto" style="margin-top:6px;text-align:start">' + T('keys') + '</div></div></div>' : '';
-  if (VS.url) h += '<div class="card va-evc"><div class="row" style="margin-bottom:6px">' + modeTabs() + '<h3 style="margin:0">' + T('lap') + ' <span id="lapn" class="chip ltr" dir="ltr">1</span></h3><span class="va-evu"><span class="chip" id="evlast"></span><button class="btn sm" id="evundo">' + pt('undo') + '</button></span></div><div class="small muted va-evh" id="evhelp">' + T('evHelp') + '</div><div class="va-btns" id="evbtns"></div></div>';
+  if (VS.url) h += '<div class="card va-evc"><div class="row" style="margin-bottom:6px">' + modeTabs() + '<h3 style="margin:0">' + T('lap') + ' <span id="lapn" class="chip ltr" dir="ltr">1</span></h3><span class="va-evu"><span class="chip" id="evlast"></span><button class="btn sm" id="evundo">' + pt('undo') + '</button></span></div><div class="small muted va-evh" id="evhelp">' + T('evHelp') + '</div><div class="va-btns" id="evbtns"></div><div id="vsig"></div></div>';
   h += toolsC + '<div class="card" id="vres"></div><div id="vpro"></div><div id="vlc">' + lapCmpHtml() + '</div></div>';
   // panneau
   h += '<div class="va-side"><div class="card"><div class="f"><label>' + T('vaSw') + '</label><select data-vc="sid"><option value="">— ' + T('needSw') + ' —</option>' + sws.map(function (s) { return '<option value="' + s.id + '"' + (c.sid === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('') + '</select></div>' +
@@ -124,6 +125,7 @@ function anaHtml() {
     '<div class="fr"><div class="f"><label>' + T('vaPool') + '</label>' + sel('pool', [[25, mU(25)], [50, mU(50)]], c.pool) + '</div><div class="f"><label>' + T('vaDist') + '</label>' + sel('dist', [25, 50, 100, 200, 400, 800, 1500].filter(function (d) { return d >= c.pool; }).map(function (d) { return [d, mU(d)]; }), c.dist) + '</div></div>' +
     '<div class="fr"><div class="f"><label>' + T('vaStroke') + '</label>' + sel('stroke', STROKES.map(function (s) { return [s[0], tv(s[1])]; }), c.stroke) + '</div><div class="f"><label>' + T('vaStart') + '</label>' + sel('start', [['dive', T('stDive')], ['push', T('stWater')], ['back', T('stBack')]], c.start) + '</div></div>' +
     '<div class="fr"><div class="f"><label>' + T('vaSlow') + '</label>' + sel('slow', [[1, T('slow1')], [2, 'Slow ×2'], [4, 'Slow ×4'], [8, 'Slow ×8']], c.slow) + '</div><div class="f"><label>' + T('vaFps') + '</label><select id="fpssel">' + [['auto', T('vaAuto')], [25, 25], [30, 30], [50, 50], [60, 60], [120, 120], [240, 240]].map(function (o) { return '<option value="' + o[0] + '"' + ((VS.fpsAuto && o[0] === 'auto') || (!VS.fpsAuto && +o[0] === VS.fps) ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div></div>' +
+    '<div class="f"><label>' + pt('cam') + '</label>' + sel('cam', [['fixed', pt('camF')], ['moving', pt('camM')]], c.cam || 'fixed') + '</div>' +
     '<div class="f"><input data-vc="label" placeholder="' + esc(T('vaLabel')) + '" value="' + esc(c.label) + '"></div>' +
     '<div class="f" style="margin:0"><label>' + T('notes') + '</label><textarea data-vc="notes" rows="3" placeholder="' + esc(T('notesP')) + '">' + esc(c.notes || '') + '</textarea></div></div>';
   h += '<div class="card"><h3>' + T('events') + '</h3><div id="evlist" class="va-evl"></div><div class="row" style="margin-top:10px;flex-wrap:wrap"><button class="btn pri" id="vsave">' + T('saveVa') + '</button><button class="btn" id="vrep">' + rt('report', L()) + '</button><button class="btn sm" id="vnew">' + T('newVa') + '</button></div></div></div></div>';
@@ -171,7 +173,7 @@ function setVideo(file) {
   if (!file) return;
   if (VS.url) try { URL.revokeObjectURL(VS.url); } catch (e) {}
   if (window.WAI) { WAI._s.ser = null; WAI._s.sug = null; WAI._s.head = null; }
-  VS.url = URL.createObjectURL(file); VS.fname = file.name; VS.keepT = 0; VS.fpsAuto = true; VS.fps = 30; K.render();
+  VS.url = URL.createObjectURL(file); VS.fname = file.name; VS.file = file; VS.keepT = 0; VS.fpsAuto = true; VS.fps = 30; K.render();
 }
 function bindAna() {
   var c = VS.cfg;
@@ -182,7 +184,7 @@ function bindAna() {
   $('#vsave').onclick = saveVa;
   $('#vrep').onclick = function () { if (!VS.ev.length) { K.toast(T('noEv')); return; } if (!VS.cfg.sid) { K.toast(T('needSw')); return; } openReport(curSrc()); };
   bindLapCmp();
-  $('#vnew').onclick = function () { if (VS.dirty && !confirm(T('unsaved'))) return; if (window.WAI) WAI.reset(); VS.id = null; VS.ev = []; VS.snaps = []; VS.meas = []; VS.trk = []; VS.mimg = {}; VS.dirty = false; VS.cfg = Object.assign(defCfg(), { sid: c.sid, date: c.date, ctx: c.ctx, pool: c.pool, dist: c.dist, stroke: c.stroke, start: c.start, slow: c.slow }); K.render(); };
+  $('#vnew').onclick = function () { if (VS.dirty && !confirm(T('unsaved'))) return; if (window.WAI) WAI.reset(); VS.id = null; VS.ev = []; VS.snaps = []; VS.meas = []; VS.trk = []; VS.trk2 = []; VS.mimg = {}; VS.dirty = false; VS.cfg = Object.assign(defCfg(), { sid: c.sid, date: c.date, ctx: c.ctx, pool: c.pool, dist: c.dist, stroke: c.stroke, start: c.start, slow: c.slow, cam: c.cam }); K.render(); };
   refresh();
   var vid = $('#vid'); if (!vid || !VS.url) return;
   vid.playbackRate = 0.25;
@@ -267,7 +269,7 @@ function saveVa() {
   var r = compute(c, VS.ev), id = VS.id || K.uid();
   var XX = computeX(c, VS.ev), iv0 = ivvOf(c, VS.trk, VS.cal);
   var sum = { idc: XX.arm ? XX.arm.idc : null, ivv: iv0 ? iv0.ivv : null, bt: XX.st.bt, final: r.final, rt: r.rt, t15: r.t15, turn: r.turn, turnSum: r.turnSum, v: r.v, sr: r.sr, dps: r.dps, fin5: r.fin5, vDrop: r.vDrop, srDrop: r.srDrop };
-  K.mutate('saveTest', { rec: { id: id, swimmerId: c.sid, type: 'va', date: c.date || K.today(), data: { cfg: JSON.parse(JSON.stringify(c)), ev: VS.ev.map(function (e) { return { k: e.k, t: Math.round(e.t * 10000) / 10000, d: e.d }; }), fname: VS.fname, sum: sum, meas: VS.meas || [], cal: VS.cal || null, trk: VS.trk || [] } } });
+  K.mutate('saveTest', { rec: { id: id, swimmerId: c.sid, type: 'va', date: c.date || K.today(), data: { cfg: JSON.parse(JSON.stringify(c)), ev: VS.ev.map(function (e) { return { k: e.k, t: Math.round(e.t * 10000) / 10000, d: e.d }; }), fname: VS.fname, sum: sum, meas: VS.meas || [], cal: VS.cal || null, trk: VS.trk || [], trk2: VS.trk2 || [] } } });
   if (VS.snaps && VS.snaps.length) { try { localStorage.setItem('wav_snaps_' + id, JSON.stringify(VS.snaps)); } catch (e) {} }
   if (VS.mimg) { var keep = {}; (VS.meas || []).forEach(function (m) { if (VS.mimg[m.id]) keep[m.id] = VS.mimg[m.id]; }); try { localStorage.setItem('wav_mimg_' + id, JSON.stringify(keep)); } catch (e) {} }
   VS.id = id; VS.dirty = false; K.toast(T('saved')); K.render();
@@ -275,7 +277,7 @@ function saveVa() {
 function openRec(rec) {
   VS.id = rec.id; VS.cfg = Object.assign(defCfg(), rec.data.cfg || {}, { sid: rec.swimmerId, date: rec.date }); VS.ev = (rec.data.ev || []).map(function (e) { return { k: e.k, t: e.t, d: e.d }; });
   if (VS.fname !== rec.data.fname && VS.url) { try { URL.revokeObjectURL(VS.url); } catch (e) {} VS.url = null; }
-  VS.fname = rec.data.fname || ''; VS.snaps = snapsOf(rec.id).slice(); VS.meas = JSON.parse(JSON.stringify(rec.data.meas || [])); VS.cal = rec.data.cal || null; VS.trk = JSON.parse(JSON.stringify(rec.data.trk || [])); VS.mimg = mimgOf(rec.id); VS.dirty = false; VS.tab = 'new'; K.render();
+  VS.fname = rec.data.fname || ''; VS.snaps = snapsOf(rec.id).slice(); VS.meas = JSON.parse(JSON.stringify(rec.data.meas || [])); VS.cal = rec.data.cal || null; VS.trk = JSON.parse(JSON.stringify(rec.data.trk || [])); VS.trk2 = JSON.parse(JSON.stringify(rec.data.trk2 || [])); VS.mimg = mimgOf(rec.id); VS.dirty = false; VS.tab = 'new'; K.render();
 }
 
 /* ---------- historique ---------- */
@@ -466,10 +468,10 @@ function loadImgs(src) { return Promise.all(src.map(function (s) { return new Pr
 function drawReport(src, lg) {
   var c = src.cfg, evs = src.ev, r = compute(c, evs), ck = checkEv(c, evs, r, lg), sm = summary(c, r, lg), ph = phasesOf(c, evs, r);
   var prev = prevOf(src.sid, c, src.id, src.date), pr = prev ? compute(Object.assign(defCfg(), prev.data.cfg), prev.data.ev || []) : null;
-  var MS = (src.meas || []).filter(function (m) { return m.ty === 'ang3' || m.ty === 'angH' || m.ty === 'dist'; }), MI = MS.filter(function (m) { return src.mimg && src.mimg[m.id]; }).slice(0, 6);
-  return Promise.all([logoImg(), loadImgs(snapsOf(src.id).slice(0, 3)), loadImgs(MI.map(function (m) { return src.mimg[m.id]; }))]).then(function (res) {
-    var logo = res[0], snaps = res[1].filter(Boolean), mimgs = res[2];
-    var W = 1240, M = 64, cv = document.createElement('canvas'); cv.width = W; cv.height = 4200;
+  var MS = (src.meas || []).filter(function (m) { return (m.ty === 'ang3' || m.ty === 'angH' || m.ty === 'dist') && (m.src !== 'ai' || m.ok) && !(m.ty === 'dist' && c.cam === 'moving'); }), MI = MS.filter(function (m) { return src.mimg && src.mimg[m.id]; }).slice(0, 6);
+  return Promise.all([logoImg(), loadImgs(snapsOf(src.id).slice(0, 3)), loadImgs(MI.map(function (m) { return src.mimg[m.id]; })), window.WFX ? WFX.prep(src) : null]).then(function (res) {
+    var logo = res[0], snaps = res[1].filter(Boolean), mimgs = res[2], FXP = res[3];
+    var W = 1240, M = 64, cv = document.createElement('canvas'); cv.width = W; cv.height = 9000;
     var g = cv.getContext('2d'), rtl = lg !== 'fr', FN = '"IBM Plex Sans Arabic","Inter","Segoe UI",Tahoma,sans-serif', NF = '"Inter","Segoe UI",Arial,sans-serif';
     var X = function (x) { return rtl ? W - x : x; };
     var AR = /[\u0600-\u06FF]/; var tx = function (s, x, y, o) { o = o || {}; if (o.auto && !rtl && AR.test(s)) { o = Object.assign({}, o, { raw: 1, a: 'right' }); g.save(); g.font = (o.w || 500) + ' ' + (o.s || 22) + 'px ' + FN; g.fillStyle = o.c || '#0f172a'; g.direction = 'rtl'; g.textAlign = 'right'; g.fillText(String(s), W - M, y); g.restore(); return; } g.save(); g.font = (o.w || 500) + ' ' + (o.s || 22) + 'px ' + (o.n ? NF : FN); g.fillStyle = o.c || '#0f172a'; g.direction = o.n ? 'ltr' : (rtl ? 'rtl' : 'ltr'); g.textAlign = o.a || (o.n ? (rtl ? 'right' : 'left') : 'start'); g.textBaseline = 'alphabetic'; g.fillText(String(s), o.raw ? x : X(x), y); g.restore(); };
@@ -503,6 +505,8 @@ function drawReport(src, lg) {
       var rows = sm.good.map(function (s) { return ['✅ ' + rt('good', lg) + ' : ', s, '#047857']; }).concat(sm.bad.map(function (s) { return ['🔻 ' + rt('bad', lg) + ' : ', s, '#b91c1c']; })); if (sm.focus) rows.push(['🎯 ' + rt('focus', lg) + ' : ', sm.focus, '#0b2a6e']);
       rows.forEach(function (rw) { y += wrap(rw[0] + rw[1], M + 10, y + 22, W - 2 * M - 20, { s: 22, w: 600, c: rw[2], lh: 34 }) + 6; }); y += 20;
     } else { y = title(rt('sum', lg), y); y += wrap(rt('noSum', lg), M + 10, y + 20, W - 2 * M - 20, { s: 19, c: '#64748b' }) + 20; }
+    // 🔧 الأخطاء والتصحيح
+    if (window.WFX && FXP) y = WFX.drawRep({ g: g, tx: tx, wrap: wrap, rect: rect, title: title, W: W, M: M, rtl: rtl, y: y }, FXP, lg);
     // tableau des longueurs
     y = title(rt('laps', lg), y);
     var cols = [['lap', 0.07], ['split', 0.11], ['cum', 0.12], ['brk', 0.17], ['v', 0.12], ['sr', 0.11], ['dps', 0.11], ['turnC', 0.19]], tw = W - 2 * M;
@@ -533,7 +537,7 @@ function drawReport(src, lg) {
       y += 150;
     }
     // ---- analyse avancée
-    var XX = computeX(c, evs), kk = src.cal && src.cal.pts ? src.cal.m / Math.hypot(src.cal.pts[1].x - src.cal.pts[0].x, src.cal.pts[1].y - src.cal.pts[0].y) : null;
+    var XX = computeX(c, evs), kk = src.cal && src.cal.pts && c.cam !== 'moving' ? src.cal.m / Math.hypot(src.cal.pts[1].x - src.cal.pts[0].x, src.cal.pts[1].y - src.cal.pts[0].y) : null;
     var kv = function (items) { var cw2 = (W - 2 * M - 3 * 16) / 4; items.forEach(function (it, i) { var cx = M + (i % 4) * (cw2 + 16), cy = y + Math.floor(i / 4) * 100; rect(cx, cy, cw2, 86, '#f1f6fd', 12); tx(it[0], cx + 16, cy + 30, { s: 17, w: 700, c: '#0b2a6e' }); tx(it[1], rtl ? W - cx - 16 : cx + 16, cy + 70, { s: 28, w: 800, n: 1, raw: 1, a: rtl ? 'right' : 'left' }); }); y += Math.ceil(items.length / 4) * 100 + 14; };
     var tbl = function (head, rows, fr) { var tw2 = W - 2 * M; rect(M, y, tw2, 40, '#0b2a6e', 8); var x0 = 0; head.forEach(function (hh, j) { var w = tw2 * fr[j]; tx(hh, rtl ? W - M - x0 - w / 2 : M + x0 + w / 2, y + 27, { s: 16, w: 700, c: '#fff', raw: 1, a: 'center' }); x0 += w; }); y += 40; rows.forEach(function (rw, i) { if (i % 2) rect(M, y, tw2, 38, '#f5f8fd', 0); var x1 = 0; rw.forEach(function (v, j) { var w = tw2 * fr[j]; tx(String(v), rtl ? W - M - x1 - w / 2 : M + x1 + w / 2, y + 26, { s: 17, w: j ? 500 : 700, n: j ? 1 : 0, raw: 1, a: 'center' }); x1 += w; }); y += 38; }); y += 24; };
     var nn = function (x, d, u) { return f2n(x, d, u); };
@@ -642,6 +646,9 @@ var PD = {
   ivvNote: ['IVV = التذبذب في السرعة داخل الدورة. السباحين الكبار قرابة 7%، المبتدئين قرابة 10%. كل ما يكون أقل، السباحة أنعم وأقل تعب. يحتاج كاميرا ثابتة من الجنب ومعايرة.', 'IVV = fluctuation de la vitesse dans le cycle. ≈7 % chez les élites, ≈10 % chez les débutants. Plus bas = nage plus fluide. Caméra latérale fixe + étalonnage.'],
   trkStep: ['التقدم بعد كل نقطة', 'Avance après chaque point'], trkClr: ['مسح التتبع', 'Effacer le suivi'], img: ['صورة', 'image'], imgs: ['صور', 'images'],
   pinT: ['ثبّت الفيديو فوق كي تهبط', 'Garder la vidéo visible en défilant'], undo: ['↶ تراجع', '↶ Annuler'], last: ['آخر حدث', 'Dernier'], undoM: ['↶ تراجع على آخر رسم', '↶ Annuler le dernier dessin'], clrF: ['🗑 مسح رسومات هذي الصورة', '🗑 Effacer les dessins de cette image'], none: ['—', '—'], undone: ['تراجعت', 'Annulé'],
+  confirm: ['✓ أكّد', '✓ Confirmer'], aiPend: ['قياس من الـ AI: شوف النقاط في الصورة وأكّد باش يدخل للأخطاء والتقرير', 'Mesure IA : vérifiez les points puis confirmez pour l’intégrer aux erreurs et au rapport'],
+  cam: ['📷 الكاميرا', '📷 Caméra'], camF: ['ثابتة (حامل)', 'fixe (trépied)'], camM: ['تتحرك (تتبع السباح)', 'mobile (suit le nageur)'],
+  camNo: ['📷 الكاميرا تتحرك: المسافات بالبيكسل (السرعة بالتتبع، IVV، المسافة 📏) ما تتحسبش. أوقات العلامات (5 م، 15 م، الحيط) تبقى صحيحة.', '📷 Caméra mobile : pas de mesures en pixels (vitesse par suivi, IVV, distances 📏). Les temps aux repères (5 m, 15 m, mur) restent valides.'],
   ok: ['✓', '✓'], out: ['⚠ خارج المرجع', '⚠ hors réf.'], del: ['حذف', 'Suppr.']
 };
 function ls0(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
@@ -659,11 +666,13 @@ var MPRE = [
   { n: ['زاوية دخول اليد', 'Angle d’entrée de la main'], ty: 'angH' },
   { n: ['مسافة الطيران', 'Distance de vol'], ty: 'dist' },
   { n: ['عمق الغطس', 'Profondeur après l’entrée'], ty: 'dist' },
-  { n: ['عمق اليد في الشد', 'Profondeur de la main'], ty: 'dist' }
+  { n: ['عمق اليد في الشد', 'Profondeur de la main'], ty: 'dist' },
+  { n: ['الراس في الكولي (أذن-كتف-ورك)', 'Tête en coulée (oreille-épaule-hanche)'], ty: 'ang3', lo: 160, hi: 185 },
+  { n: ['ميلان الجسم في الكولي', 'Inclinaison du corps en coulée'], ty: 'angH', lo: 0, hi: 10 }
 ];
 function refs() { var o = {}; MPRE.forEach(function (p) { if (p.lo != null) o[p.n[0]] = o[p.n[1]] = [p.lo, p.hi]; }); try { Object.assign(o, JSON.parse(localStorage.getItem('wav_refs') || '{}')); } catch (e) {} return o; }
 function setRef(name, lo, hi) { var o = {}; try { o = JSON.parse(localStorage.getItem('wav_refs') || '{}'); } catch (e) {} o[name] = [lo, hi]; try { localStorage.setItem('wav_refs', JSON.stringify(o)); } catch (e) {} }
-function mPx() { var c = VS.cal; if (!c || !c.pts || c.pts.length < 2 || !c.m) return null; var d = Math.hypot(c.pts[1].x - c.pts[0].x, c.pts[1].y - c.pts[0].y); return d ? c.m / d : null; }
+function mPx() { if (VS.cfg && VS.cfg.cam === 'moving') return null; var c = VS.cal; if (!c || !c.pts || c.pts.length < 2 || !c.m) return null; var d = Math.hypot(c.pts[1].x - c.pts[0].x, c.pts[1].y - c.pts[0].y); return d ? c.m / d : null; }
 function angOf(m) {
   var P = m.pts;
   if (m.ty === 'ang3' && P.length === 3) { var a = Math.atan2(P[0].y - P[1].y, P[0].x - P[1].x), b = Math.atan2(P[2].y - P[1].y, P[2].x - P[1].x), d = Math.abs(a - b) * 180 / Math.PI; return d > 180 ? 360 - d : d; }
@@ -792,6 +801,7 @@ function computeX(c, evs) {
   return { r: r, st: st, turns: turns, arm: arm, br: br };
 }
 function ivvOf(c, trk, cal) {
+  if (c && c.cam === 'moving') return null;
   if (!trk || trk.length < 6 || !cal || !cal.pts || !cal.m) return null;
   var f = +c.slow || 1, dx = cal.pts[1].x - cal.pts[0].x, dy = cal.pts[1].y - cal.pts[0].y, L0 = Math.hypot(dx, dy), u = { x: dx / L0, y: dy / L0 }, k = cal.m / L0;
   var s = trk.map(function (q) { return { t: q.t / f, s: (q.x * u.x + q.y * u.y) * k }; }), v = [];
@@ -823,7 +833,7 @@ function proHtml() {
   if (X.br) h += '<div class="card"><h3>' + pt('brT') + '</h3><div class="va-kpis">' + X.br.perLap.map(function (n, i) { return kpi(T('lap') + ' ' + (i + 1), n, ''); }).join('') + kpi(pt('brC'), f2n(X.br.perCyc, 1), '') + '</div></div>';
   // IVV
   var iv = ivvOf(c, VS.trk, VS.cal);
-  if ((VS.trk && VS.trk.length) || VS.tool === 'trk') h += '<div class="card"><h3>' + pt('ivvT') + '</h3>' + (iv ? '<div class="va-kpis">' + kpi(pt('ivv'), f2n(iv.ivv, 1, '%'), '') + kpi(pt('vMean'), f2n(iv.mean), 'm/s') + kpi(pt('vMin'), f2n(iv.min), 'm/s') + kpi(pt('vMax'), f2n(iv.max), 'm/s') + kpi(pt('nPts'), iv.n, '') + '</div><div class="chart" style="height:180px"><canvas id="ivch"></canvas></div>' : '<p class="small muted">' + (VS.trk ? VS.trk.length : 0) + ' ' + pt('nPts') + ' · ' + (mPx() ? '' : pt('needCal')) + '</p>') + '<p class="small muted">' + pt('ivvNote') + '</p></div>';
+  if ((VS.trk && VS.trk.length) || VS.tool === 'trk') h += '<div class="card"><h3>' + pt('ivvT') + '</h3>' + (iv ? '<div class="va-kpis">' + kpi(pt('ivv'), f2n(iv.ivv, 1, '%'), '') + kpi(pt('vMean'), f2n(iv.mean), 'm/s') + kpi(pt('vMin'), f2n(iv.min), 'm/s') + kpi(pt('vMax'), f2n(iv.max), 'm/s') + kpi(pt('nPts'), iv.n, '') + '</div><div class="chart" style="height:180px"><canvas id="ivch"></canvas></div>' : '<p class="small muted">' + (VS.trk ? VS.trk.length : 0) + ' ' + pt('nPts') + ' · ' + (c.cam === 'moving' ? pt('camNo') : mPx() ? '' : pt('needCal')) + '</p>') + '<p class="small muted">' + pt('ivvNote') + '</p></div>';
   // mesures
   var ms = (VS.meas || []).filter(function (m) { return m.ty === 'ang3' || m.ty === 'angH' || m.ty === 'dist'; }), dr = (VS.meas || []).filter(function (m) { return !(m.ty === 'ang3' || m.ty === 'angH' || m.ty === 'dist'); }), R = refs();
   var prev = VS.cfg.sid ? prevOf(VS.cfg.sid, VS.cfg, VS.id, VS.cfg.date) : null, pm = prev ? (prev.data.meas || []) : [], pk = prev && prev.data.cal ? (function () { var cc = prev.data.cal, d = Math.hypot(cc.pts[1].x - cc.pts[0].x, cc.pts[1].y - cc.pts[0].y); return d ? cc.m / d : null; })() : null;
@@ -832,7 +842,7 @@ function proHtml() {
   else {
     h += '<datalist id="mpre">' + MPRE.map(function (p) { return '<option value="' + esc(tv(p.n)) + '">'; }).join('') + '</datalist><div class="tbl-wrap"><table class="va-mt"><tr><th>' + pt('mT') + '</th><th>' + pt('mName') + '</th><th>' + pt('mVal') + '</th><th>' + pt('mRef') + '</th><th>' + pt('mPrev') + '</th><th></th></tr>' +
       ms.map(function (m) { var v = mVal(m), st = mStatus(m, v), r = R[m.name] || ['', ''], pv = pm.filter(function (q) { return q.name === m.name; }).map(function (q) { return mVal(q, pk); }).filter(function (x) { return x != null; }); var pvv = pv.length ? pv.reduce(function (a, b) { return a + b; }, 0) / pv.length : null;
-        return '<tr><td class="num"><a href="#" data-mt="' + m.t + '">' + F(m.t / (+c.slow || 1), 2) + '</a></td><td><input data-mn="' + m.id + '" list="mpre" value="' + esc(m.name || '') + '"></td><td class="num"><b>' + mTxt(m) + '</b> ' + (st ? '<span class="chip ' + (st === 'ok' ? 'ok' : 'warn') + '">' + pt(st) + '</span>' : '') + '</td><td>' + (m.ty === 'dist' ? '—' : '<span class="va-ref"><input data-rlo="' + esc(m.name) + '" value="' + r[0] + '" inputmode="decimal">–<input data-rhi="' + esc(m.name) + '" value="' + r[1] + '" inputmode="decimal">°</span>') + '</td><td class="num">' + (pvv != null ? (m.ty === 'dist' ? pvv.toFixed(2) + ' m' : Math.round(pvv) + '°') + (v != null ? ' <small class="muted">(' + (v - pvv >= 0 ? '+' : '−') + (m.ty === 'dist' ? Math.abs(v - pvv).toFixed(2) : Math.round(Math.abs(v - pvv))) + ')</small>' : '') : '—') + '</td><td><button class="btn sm" data-md="' + m.id + '">✕</button></td></tr>'; }).join('') +
+        return '<tr><td class="num"><a href="#" data-mt="' + m.t + '">' + F(m.t / (+c.slow || 1), 2) + '</a></td><td><input data-mn="' + m.id + '" list="mpre" value="' + esc(m.name || '') + '"></td><td class="num"><b>' + mTxt(m) + '</b> ' + (m.src === 'ai' ? (m.ok ? '<span class="chip ok" title="AI">🤖✓</span> ' : '<button class="btn sm" data-mok="' + m.id + '" title="' + esc(pt('aiPend')) + '">🤖 ' + pt('confirm') + '</button> ') : '') + (st ? '<span class="chip ' + (st === 'ok' ? 'ok' : 'warn') + '">' + pt(st) + '</span>' : '') + '</td><td>' + (m.ty === 'dist' ? '—' : '<span class="va-ref"><input data-rlo="' + esc(m.name) + '" value="' + r[0] + '" inputmode="decimal">–<input data-rhi="' + esc(m.name) + '" value="' + r[1] + '" inputmode="decimal">°</span>') + '</td><td class="num">' + (pvv != null ? (m.ty === 'dist' ? pvv.toFixed(2) + ' m' : Math.round(pvv) + '°') + (v != null ? ' <small class="muted">(' + (v - pvv >= 0 ? '+' : '−') + (m.ty === 'dist' ? Math.abs(v - pvv).toFixed(2) : Math.round(Math.abs(v - pvv))) + ')</small>' : '') : '—') + '</td><td><button class="btn sm" data-md="' + m.id + '">✕</button></td></tr>'; }).join('') +
       dr.map(function (m) { return '<tr><td class="num"><a href="#" data-mt="' + m.t + '">' + F(m.t / (+c.slow || 1), 2) + '</a></td><td colspan="4" class="small muted" style="text-align:start">' + pt('t_' + m.ty) + (m.txt ? ' · ' + esc(m.txt) : '') + '</td><td><button class="btn sm" data-md="' + m.id + '">✕</button></td></tr>'; }).join('') + '</table></div><p class="small muted">' + pt('refNote') + '</p>';
     var groups = {}; ms.forEach(function (m) { if (m.name) (groups[m.name] = groups[m.name] || []).push(m); });
     var gl = Object.keys(groups).filter(function (n) { return groups[n].length >= 2; });
@@ -848,6 +858,7 @@ function bindPro() {
   $$('[data-mt]').forEach(function (a) { a.onclick = function (e) { e.preventDefault(); var v = $('#vid'); if (v) { v.pause(); seekV(v, +a.dataset.mt); } }; });
   $$('[data-mn]').forEach(function (i) { i.onchange = function () { var m = (VS.meas || []).find(function (q) { return q.id === i.dataset.mn; }); if (m) { m.name = i.value.trim(); VS.dirty = true; refreshRes(); drawOv(); } }; });
   $$('[data-rlo],[data-rhi]').forEach(function (i) { i.onchange = function () { var n = i.dataset.rlo || i.dataset.rhi, lo = parseFloat($('[data-rlo="' + CSS.escape(n) + '"]').value), hi = parseFloat($('[data-rhi="' + CSS.escape(n) + '"]').value); if (isFinite(lo) && isFinite(hi)) { setRef(n, lo, hi); refreshRes(); } }; });
+  $$('[data-mok]').forEach(function (b) { b.onclick = function () { var m = (VS.meas || []).find(function (q) { return q.id === b.dataset.mok; }); if (m) { m.ok = true; VS.dirty = true; refreshRes(); } }; });
   $$('[data-md]').forEach(function (b) { b.onclick = function () { VS.meas = (VS.meas || []).filter(function (m) { return m.id !== b.dataset.md; }); if (VS.mimg) delete VS.mimg[b.dataset.md]; VS.dirty = true; refreshRes(); drawOv(); }; });
   if (window.Chart) {
     var o = K.chartBase();
@@ -855,7 +866,7 @@ function bindPro() {
     (VS._mg || []).forEach(function (gr, i) { var o2 = K.chartBase(); o2.plugins.legend = { display: false }; o2.scales = { x: { type: 'linear', title: { display: true, text: 's' } } }; K.mk('mch' + i, { type: 'line', data: { datasets: [{ data: gr.slice().sort(function (a, b) { return a.t - b.t; }).map(function (m) { return { x: +(m.t / (+c.slow || 1)).toFixed(2), y: +(mVal(m) || 0).toFixed(2) }; }), borderColor: '#22d3ee', backgroundColor: '#22d3ee', tension: 0.3 }] }, options: o2 }); });
   }
 }
-function refreshRes() { if ($('#vpro')) { $('#vpro').innerHTML = proHtml(); bindPro(); } }
+function refreshRes() { if ($('#vpro')) { $('#vpro').innerHTML = (window.WFX ? WFX.html() : '') + proHtml(); bindPro(); if (window.WFX) WFX.bind(); } }
 
 /* --- boutons d'événements par mode --- */
 var MODES = { race: null, st: ['S', 'O', 'HE', 'DK', 'B', 'M5', 'M15', 'W', 'TO'], arm: ['RE', 'RP', 'RS', 'RX', 'LE', 'LP', 'LS', 'LX'], bk: ['BR', 'K', 'C'] };
@@ -877,6 +888,7 @@ function renderBtns() {
   var le = VS.ev[VS.ev.length - 1]; if ($('#evlast')) $('#evlast').textContent = pt('last') + ' : ' + (le ? evLabel(le) : '—');
   if ($('#evundo')) { $('#evundo').onclick = undoEv; $('#evundo').disabled = !VS.ev.length; }
   $$('[data-ev]', box).forEach(function (bt) { bt.onclick = function () { addEv(bt.dataset.ev); }; });
+  if (window.WLIVE) WLIVE.sig();
 }
 function bindModes() { $$('[data-mode]').forEach(function (b) { b.onclick = function () { VS.mode = b.dataset.mode; $$('[data-mode]').forEach(function (x) { x.classList.toggle('on', x === b); }); renderBtns(); }; }); }
 
@@ -1001,5 +1013,5 @@ function bindSw() {
 
 window.BTV.views.btVideo = vVideo;
 window.BTV.video = { section: swimmerSection, bind: bindSwimmerSection, compute: compute };
-window.VAX = { VS: VS, PD: PD, MPRE: MPRE, angOf: angOf, refs: refs, pt: pt, tv: tv, thumbFor: thumbFor, vidPt: vidPt, seekV: seekV, setTool: setTool, toolBar: toolBar, bindTools: bindTools, refresh: refresh, refreshRes: refreshRes, drawOv: drawOv, mPx: mPx, L: L };
+window.VAX = { compute: compute, computeX: computeX, addEv: addEv, setVideo: setVideo, render: function () { K.render(); }, VS: VS, PD: PD, MPRE: MPRE, angOf: angOf, refs: refs, pt: pt, tv: tv, thumbFor: thumbFor, vidPt: vidPt, seekV: seekV, setTool: setTool, toolBar: toolBar, bindTools: bindTools, refresh: refresh, refreshRes: refreshRes, drawOv: drawOv, mPx: mPx, L: L };
 })();
